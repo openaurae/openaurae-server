@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger } from "hono/logger";
 import { deviceApi } from "./device";
+import { metricsApi } from "./metrics.ts";
 import { auth0 } from "./middleware";
 import type { ApiEnv } from "./types";
 
@@ -18,11 +19,13 @@ app.use("/me", auth0).get("/me", (c) => {
 		jwtPayload,
 	});
 });
-
-app.basePath("/api/v1").route("devices", deviceApi);
-
 app.get("/health", (c) => {
 	return c.json({
 		status: "up",
 	});
 });
+
+const api = app.basePath("/api/v1");
+
+api.route("/devices", deviceApi);
+api.route("/metrics", metricsApi);

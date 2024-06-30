@@ -6,6 +6,7 @@
 		"lefthook": "lefthook install"
 	},
 	"dependencies": {
+		"@hono/zod-validator": "^0.2.2",
 		"cassandra-driver": "^4.7.2",
 		"hono": "^4.4.9",
 		"jsonwebtoken": "^9.0.2",

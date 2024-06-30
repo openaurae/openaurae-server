@@ -95,8 +95,8 @@ export const sensorTypes = [
 	"zigbee_power",
 ] as const;
 
-export const SensorType = z.enum(sensorTypes);
-export type SensorType = z.infer<typeof SensorType>;
+export const SensorTypeParser = z.enum(sensorTypes);
+export type SensorType = z.infer<typeof SensorTypeParser>;
 
 export type Metrics = Omit<
 	Reading,

@@ -1,6 +1,13 @@
 import * as cassandra from "cassandra-driver";
 import { cassandraHost, cassandraKeyspace } from "../env";
-import type { Correction, Device, Reading, Sensor, User } from "./types";
+import type {
+	Correction,
+	Device,
+	Reading,
+	Sensor,
+	SensorType,
+	User,
+} from "./types";
 
 type ModelMapper<T> = cassandra.mapping.ModelMapper<T>;
 const q = cassandra.mapping.q;
@@ -82,6 +89,52 @@ export class Database {
 		});
 		return result.toArray();
 	}
+
+	async sensorMetrics({
+		deviceId,
+		date,
+		processed,
+		sensorId,
+		metric,
+		sensorType,
+		limit,
+		order,
+	}: SensorMetricsProps): Promise<Reading[]> {
+		const asc = order === "asc";
+
+		const result = await this.readingMapper.find(
+			{
+				device: deviceId,
+				date: date,
+				reading_type: sensorType,
+				sensor_id: sensorId,
+				processed,
+			},
+			{
+				fields: ["time", metric],
+				orderBy: {
+					reading_type: "asc",
+					sensor_id: "asc",
+					processed: "asc",
+					time: "desc",
+				},
+				limit: asc ? undefined : limit,
+			},
+		);
+		const metrics = result.toArray().reverse();
+		return asc ? metrics.slice(0, limit) : metrics;
+	}
+}
+
+export interface SensorMetricsProps {
+	deviceId: string;
+	sensorId: string;
+	sensorType: SensorType;
+	metric: string;
+	processed: boolean;
+	limit?: number;
+	date: Date;
+	order: "asc" | "desc";
 }
 
 export const db = new Database(cassandraHost, cassandraKeyspace);
@@ -96,3 +149,5 @@ export type {
 	Metric,
 	Metrics,
 } from "./types";
+
+export { SensorTypeParser } from "./types";
