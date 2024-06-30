@@ -6,7 +6,8 @@
 		"lefthook": "lefthook install"
 	},
 	"dependencies": {
-		"hono": "^4.4.9"
+		"hono": "^4.4.9",
+		"jsonwebtoken": "^9.0.2"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
