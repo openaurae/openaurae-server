@@ -97,3 +97,12 @@ export const sensorTypes = [
 
 export const SensorType = z.enum(sensorTypes);
 export type SensorType = z.infer<typeof SensorType>;
+
+export type Metrics = Omit<
+	Reading,
+	"reading_type" | "device" | "sensor_id" | "date" | "time" | "processed"
+>;
+export type MetricName = keyof Metrics;
+export type Metric<T extends MetricName> = {
+	[key in T]: Metrics[T];
+};

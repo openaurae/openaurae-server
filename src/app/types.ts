@@ -1,6 +1,6 @@
 import type { Env } from "hono";
 import type { JwtPayload } from "jsonwebtoken";
-import type { Device } from "../database";
+import type { Device, Metrics } from "../database";
 
 export type ContextVariables = Record<string, unknown>;
 
@@ -52,3 +52,18 @@ export interface DeviceVariables extends ContextVariables {
  * Device ids in apis should be verified existence and ownership.
  */
 export type DeviceApiEnv = HonoEnv<Auth0Variables & DeviceVariables>;
+
+/**
+ * Metrics displayed as chart in client.
+ */
+export type MetricName = keyof Pick<
+	Metrics,
+	| "temperature"
+	| "pm25"
+	| "tvoc"
+	| "ch2o"
+	| "occupancy"
+	| "contact"
+	| "power"
+	| "angle"
+>;

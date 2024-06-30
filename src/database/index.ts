@@ -85,4 +85,14 @@ export class Database {
 }
 
 export const db = new Database(cassandraHost, cassandraKeyspace);
-export type { Correction, Device, Reading, Sensor, User } from "./types";
+export type {
+	Correction,
+	Device,
+	Reading,
+	Sensor,
+	User,
+	SensorType,
+	MetricName,
+	Metric,
+	Metrics,
+} from "./types";
