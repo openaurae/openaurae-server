@@ -1,20 +1,13 @@
 import { type Context, Hono } from "hono";
-import { createMiddleware } from "hono/factory";
-import { HTTPException } from "hono/http-exception";
 import { db } from "../database";
-import type { Device } from "../database/types.ts";
-import { auth0 } from "./auth";
-import type { AppEnv } from "./types";
-
-interface DeviceApiEnv extends AppEnv {
-	device: Device;
-}
+import { auth0, checkDeviceOwnership } from "./middleware";
+import type { ApiEnv, DeviceApiEnv } from "./types";
 
 export const deviceApi = new Hono<DeviceApiEnv>();
 
 deviceApi.use(auth0);
 
-deviceApi.get("/", async (c: Context<AppEnv>) => {
+deviceApi.get("/", async (c: Context<ApiEnv>) => {
 	const { canReadAll, userId } = c.get("user");
 	const devices = canReadAll
 		? await db.allDevices()
@@ -22,33 +15,14 @@ deviceApi.get("/", async (c: Context<AppEnv>) => {
 	return c.json(devices);
 });
 
-const checkOwnership = createMiddleware<DeviceApiEnv>(async (c, next) => {
-	const { deviceId } = c.req.param();
-	const { userId, canReadAll } = c.get("user");
-	const device = await db.getDeviceById(deviceId);
+deviceApi.use("/:deviceId/*", checkDeviceOwnership);
 
-	if (!device) {
-		return c.notFound();
-	}
+deviceApi.get("/:deviceId", async (c) => {
+	const device = c.get("device");
+	const sensors = await db.deviceSensors(device.id);
 
-	const deviceIds = await db.userDeviceIds(userId);
-
-	if (!canReadAll && !deviceIds.includes(deviceId)) {
-		throw new HTTPException(401, {
-			message: "Only admin or device owner can access this device.",
-		});
-	}
-
-	c.set("device", device);
-	await next();
-});
-
-deviceApi.use(checkOwnership);
-
-deviceApi.get("/:deviceId", async (c: Context<DeviceApiEnv>) => {
-	const { deviceId } = c.req.param();
-
-	const device = await db.getDeviceById(deviceId);
-
-	return c.json(device);
+	return c.json({
+		...device,
+		sensors,
+	});
 });

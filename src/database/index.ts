@@ -75,6 +75,14 @@ export class Database {
 		const user = await this.getUser(userId);
 		return user?.devices ?? [];
 	}
+
+	async deviceSensors(deviceId: string): Promise<Sensor[]> {
+		const result = await this.sensorMapper.find({
+			device: deviceId,
+		});
+		return result.toArray();
+	}
 }
 
 export const db = new Database(cassandraHost, cassandraKeyspace);
+export type { Correction, Device, Reading, Sensor, User } from "./types";

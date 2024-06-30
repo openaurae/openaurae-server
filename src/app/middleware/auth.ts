@@ -1,37 +1,8 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import type { JwtPayload } from "jsonwebtoken";
 import { verify } from "jsonwebtoken";
-import { jwtSecret } from "../env";
-import type { AppEnv } from "./types";
-
-/**
- * Data structure of Auth0 JWT payload.
- */
-export interface UserClaims extends JwtPayload {
-	sub: string;
-	scope: string;
-	azp: string;
-	permissions: string[];
-}
-
-/**
- * User info extracted from JWT payload.
- */
-export interface User {
-	userId: string;
-	canReadAll: boolean;
-	canModifyAll: boolean;
-	permissions: string[];
-}
-
-/**
- * Variables added to Hono context.
- */
-export interface Auth0Variables {
-	jwtPayload: UserClaims;
-	user: User;
-}
+import { jwtSecret } from "../../env.ts";
+import type { ApiEnv, Auth0User, UserClaims } from "../types.ts";
 
 /**
  * Verify access token in user requests and set user info to the Hono context.
@@ -47,7 +18,7 @@ export interface Auth0Variables {
  * @see https://github.com/auth0/node-jsonwebtoken
  * @see https://hono.dev/docs/helpers/jwt#payload-validation
  */
-export const auth0 = createMiddleware<AppEnv>(async (c, next) => {
+export const auth0 = createMiddleware<ApiEnv>(async (c, next) => {
 	const token =
 		c.req.header("Authorization")?.replace(/^Bearer /, "") ||
 		c.req.query("accessToken") ||
@@ -56,7 +27,7 @@ export const auth0 = createMiddleware<AppEnv>(async (c, next) => {
 
 	const roles = new Set(claims.permissions);
 
-	const user: User = {
+	const user: Auth0User = {
 		userId: claims.sub,
 		canReadAll: roles.has("admin") || roles.has("read:admin"),
 		canModifyAll: roles.has("admin"),
