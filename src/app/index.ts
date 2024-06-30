@@ -3,18 +3,12 @@ import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger } from "hono/logger";
 import { auth0 } from "./auth";
-import { port } from "./env";
+import { deviceApi } from "./device";
 import type { AppEnv } from "./types";
 
-const app = new Hono<AppEnv>();
+export const app = new Hono<AppEnv>();
 
 app.use(logger(), csrf(), cors());
-
-app.get("/health", (c) => {
-	return c.json({
-		status: "up",
-	});
-});
 
 app.use("/me", auth0).get("/me", (c) => {
 	const user = c.get("user");
@@ -25,7 +19,10 @@ app.use("/me", auth0).get("/me", (c) => {
 	});
 });
 
-export default {
-	port: port,
-	fetch: app.fetch,
-};
+app.basePath("/api/v1").route("devices", deviceApi);
+
+app.get("/health", (c) => {
+	return c.json({
+		status: "up",
+	});
+});

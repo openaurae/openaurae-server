@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { JwtPayload } from "jsonwebtoken";
 import { verify } from "jsonwebtoken";
-import { jwtSecret } from "./env";
+import { jwtSecret } from "../env";
 import type { AppEnv } from "./types";
 
 /**
@@ -19,7 +19,7 @@ export interface UserClaims extends JwtPayload {
  * User info extracted from JWT payload.
  */
 export interface User {
-	id: string;
+	userId: string;
 	canReadAll: boolean;
 	canModifyAll: boolean;
 	permissions: string[];
@@ -57,7 +57,7 @@ export const auth0 = createMiddleware<AppEnv>(async (c, next) => {
 	const roles = new Set(claims.permissions);
 
 	const user: User = {
-		id: claims.sub,
+		userId: claims.sub,
 		canReadAll: roles.has("admin") || roles.has("read:admin"),
 		canModifyAll: roles.has("admin"),
 		permissions: claims.permissions,
