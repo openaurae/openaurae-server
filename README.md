@@ -25,8 +25,9 @@ Set environment variables:
 cat << EOF > .env
 PORT=8000
 JWT_SECRET=secret
-CASSANDRA_HOST='127.0.0.1'
-CASSANDRA_KEYSPACE='aurae'
+CASSANDRA_HOST=127.0.0.1
+CASSANDRA_KEYSPACE=aurae
+MQTT_BROKER=http://localhost:1883
 EOF
 ```
 
