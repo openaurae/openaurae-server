@@ -1,8 +1,8 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { verify } from "jsonwebtoken";
-import { jwtSecret } from "../../env.ts";
-import type { ApiEnv, Auth0User, UserClaims } from "../types.ts";
+import { jwtSecret } from "../../env";
+import type { ApiEnv, Auth0User, UserClaims } from "../types";
 
 /**
  * Verify access token in user requests and set user info to the Hono context.
@@ -36,6 +36,24 @@ export const auth0 = createMiddleware<ApiEnv>(async (c, next) => {
 
 	c.set("jwtPayload", claims);
 	c.set("user", user);
+
+	await next();
+});
+
+/**
+ * Checks whether user is an admin who can modify all resources.
+ *
+ * Note: this middleware must be placed after {@link auth0},
+ * otherwise `c.get("user")` is `undefined`
+ */
+export const auth0Admin = createMiddleware<ApiEnv>(async (c, next) => {
+	const { canModifyAll } = c.get("user");
+
+	if (!canModifyAll) {
+		throw new HTTPException(401, {
+			message: "Admin required.",
+		});
+	}
 
 	await next();
 });

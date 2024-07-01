@@ -5,6 +5,7 @@ import { logger } from "hono/logger";
 import { deviceApi } from "./device";
 import { metricsApi } from "./metrics.ts";
 import { auth0 } from "./middleware";
+import { migrationApi } from "./migrate.ts";
 import type { ApiEnv } from "./types";
 
 export const app = new Hono<ApiEnv>();
@@ -29,3 +30,4 @@ const api = app.basePath("/api/v1");
 
 api.route("/devices", deviceApi);
 api.route("/metrics", metricsApi);
+api.route("/migrate", migrationApi);
