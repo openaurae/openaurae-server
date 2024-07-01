@@ -21,7 +21,14 @@ deviceApi.use("/:deviceId/*", checkDeviceOwnership);
 
 deviceApi.get("/:deviceId", async (c) => {
 	const device = c.get("device");
-	const sensors = await db.deviceSensors(device.id);
+	let sensors = await db.deviceSensors(device.id);
+
+	sensors = sensors.map((sensor) => ({
+		...sensor,
+		metrics: metricNamesBySensorType[sensor.type].map(
+			(metricName) => metricMetadata[metricName],
+		),
+	}));
 
 	const sensorTypes = uniq(sensors.map((sensor) => sensor.type));
 	const metricNames: MetricName[] = flatten(
