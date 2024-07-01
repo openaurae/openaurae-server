@@ -17,7 +17,7 @@ deviceApi.get("/", async (c: Context<ApiEnv>) => {
 	return c.json(devices);
 });
 
-deviceApi.use("/:deviceId/*", checkDeviceOwnership);
+deviceApi.use("/:deviceId/*", checkDeviceOwnership());
 
 deviceApi.get("/:deviceId", async (c) => {
 	const device = c.get("device");

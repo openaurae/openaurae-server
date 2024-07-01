@@ -11,7 +11,7 @@ import type { ApiEnv } from "./types";
 
 export const exportApi = new Hono<ApiEnv>();
 
-exportApi.use(auth0, checkDeviceOwnership);
+exportApi.use(auth0, checkDeviceOwnership());
 
 exportApi.get(
 	"/csv/readings",

@@ -8,30 +8,32 @@ import type { DeviceApiEnv } from "../types.ts";
  *
  * The query is valid when user is admin or user owns the device.
  */
-export const checkDeviceOwnership = createMiddleware<DeviceApiEnv>(
-	async (c, next) => {
+export const checkDeviceOwnership = ({ required } = { required: true }) =>
+	createMiddleware<DeviceApiEnv>(async (c, next) => {
 		const deviceId = c.req.param("deviceId") || c.req.query("deviceId");
 
-		if (!deviceId) {
-			return c.notFound();
+		if (required && !deviceId) {
+			throw new HTTPException(400, { message: "deviceId required" });
 		}
 
-		const { userId, canReadAll } = c.get("user");
-		const device = await db.getDeviceById(deviceId);
+		if (deviceId) {
+			const { userId, canReadAll } = c.get("user");
+			const device = await db.getDeviceById(deviceId);
 
-		if (!device) {
-			return c.notFound();
+			if (!device) {
+				return c.notFound();
+			}
+
+			const deviceIds = await db.userDeviceIds(userId);
+
+			if (!canReadAll && !deviceIds.includes(deviceId)) {
+				throw new HTTPException(401, {
+					message: "Only admin or device owner can access this device.",
+				});
+			}
+
+			c.set("device", device);
 		}
 
-		const deviceIds = await db.userDeviceIds(userId);
-
-		if (!canReadAll && !deviceIds.includes(deviceId)) {
-			throw new HTTPException(401, {
-				message: "Only admin or device owner can access this device.",
-			});
-		}
-
-		c.set("device", device);
 		await next();
-	},
-);
+	});

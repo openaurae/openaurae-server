@@ -199,6 +199,37 @@ export class Database {
 		return result.toArray();
 	}
 
+	async allCorrections(): Promise<Correction[]> {
+		const result = await this.correctionMapper.findAll();
+		return result.toArray();
+	}
+
+	async userCorrections(userId: string): Promise<Correction[]> {
+		const deviceIds = await this.userDeviceIds(userId);
+		const result = await this.correctionMapper.find({
+			device: q.in_(deviceIds),
+		});
+		return result.toArray();
+	}
+
+	async deviceCorrections(deviceId: string): Promise<Correction[]> {
+		const result = await this.correctionMapper.find({
+			device: deviceId,
+		});
+		return result.toArray();
+	}
+
+	async sensorCorrections(
+		deviceId: string,
+		sensorType: SensorType,
+	): Promise<Correction[]> {
+		const result = await this.correctionMapper.find({
+			device: deviceId,
+			reading_type: sensorType,
+		});
+		return result.toArray();
+	}
+
 	/**
 	 * Add target sensor type to the device record.
 	 *

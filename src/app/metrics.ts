@@ -7,7 +7,7 @@ import { MetricNameParser } from "./types";
 
 export const metricsApi = new Hono();
 
-metricsApi.use(auth0, checkDeviceOwnership);
+metricsApi.use(auth0, checkDeviceOwnership());
 
 metricsApi.get(
 	"/",

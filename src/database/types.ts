@@ -1,6 +1,6 @@
 import { types } from "cassandra-driver";
-import { z } from "zod";
 import LocalDate = types.LocalDate;
+import { z } from "zod";
 
 export interface User {
 	id: string;
@@ -81,7 +81,7 @@ export interface Reading {
 export interface Correction {
 	device: string;
 	reading_type: SensorType;
-	metric: string;
+	metric: keyof Metrics;
 	expression: string;
 }
 
