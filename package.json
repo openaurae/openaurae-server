@@ -9,6 +9,7 @@
 		"@hono/zod-validator": "^0.2.2",
 		"axios": "^1.7.2",
 		"cassandra-driver": "^4.7.2",
+		"csv": "^6.3.9",
 		"hono": "^4.4.9",
 		"jsonwebtoken": "^9.0.2",
 		"ramda": "^0.30.1",

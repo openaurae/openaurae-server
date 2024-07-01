@@ -191,6 +191,14 @@ export class Database {
 		}
 	}
 
+	async deviceReadings(deviceId: string, date: Date): Promise<Reading[]> {
+		const result = await this.readingMapper.find({
+			device: deviceId,
+			date,
+		});
+		return result.toArray();
+	}
+
 	/**
 	 * Add target sensor type to the device record.
 	 *

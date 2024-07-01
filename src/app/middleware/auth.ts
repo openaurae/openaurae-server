@@ -44,19 +44,21 @@ export const auth0 = createMiddleware<ApiEnv>(async (c, next) => {
  * Checks whether user is an admin who can modify all resources.
  *
  * Note: this middleware must be placed after {@link auth0},
- * otherwise `c.get("user")` is `undefined`
+ * otherwise `c.get("user")` is `undefined`.
  */
-export const auth0Admin = createMiddleware<ApiEnv>(async (c, next) => {
-	const { canModifyAll } = c.get("user");
+export const auth0Admin = ({ write } = { write: false }) =>
+	createMiddleware<ApiEnv>(async (c, next) => {
+		const { canModifyAll, canReadAll } = c.get("user");
 
-	if (!canModifyAll) {
-		throw new HTTPException(401, {
-			message: "Admin required.",
-		});
-	}
+		// both "admin" and "read:admin" can read all resources, while user cannot
+		if (!canReadAll || (write && !canModifyAll)) {
+			throw new HTTPException(401, {
+				message: "Admin required.",
+			});
+		}
 
-	await next();
-});
+		await next();
+	});
 
 const verifyToken = (token: string): UserClaims => {
 	try {

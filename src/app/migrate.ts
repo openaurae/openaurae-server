@@ -7,7 +7,7 @@ import type { ApiEnv } from "./types.ts";
 
 export const migrationApi = new Hono<ApiEnv>();
 
-migrationApi.use(auth0, auth0Admin);
+migrationApi.use(auth0, auth0Admin({ write: true }));
 
 migrationApi.post("/aws/devices", async (c) => {
 	await migrateDevices();
