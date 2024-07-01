@@ -6,12 +6,12 @@ import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
 import { db } from "../database";
-import { auth0, auth0Admin } from "./middleware";
+import { auth0, checkDeviceOwnership } from "./middleware";
 import type { ApiEnv } from "./types";
 
 export const exportApi = new Hono<ApiEnv>();
 
-exportApi.use(auth0, auth0Admin());
+exportApi.use(auth0, checkDeviceOwnership);
 
 exportApi.get(
 	"/csv/readings",
