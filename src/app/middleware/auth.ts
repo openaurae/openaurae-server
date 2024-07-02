@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { verify } from "jsonwebtoken";
-import { jwtSecret } from "../../env";
+import { auth0Audience, auth0Issuer, auth0Secret } from "../../env";
 import type { ApiEnv, Auth0User, UserClaims } from "../types";
 
 /**
@@ -62,10 +62,10 @@ export const auth0Admin = ({ write } = { write: false }) =>
 
 const verifyToken = (token: string): UserClaims => {
 	try {
-		return <UserClaims>verify(token, jwtSecret, {
+		return <UserClaims>verify(token, auth0Secret, {
 			algorithms: ["HS256"],
-			audience: "http://new.openaurae.org/api/",
-			issuer: "https://aurae.au.auth0.com/",
+			audience: auth0Audience,
+			issuer: auth0Issuer,
 		});
 	} catch (e) {
 		throw new HTTPException(401, {
