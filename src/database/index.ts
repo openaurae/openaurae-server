@@ -60,6 +60,10 @@ export class Database {
 		await this.deviceMapper.insert(device);
 	}
 
+	async removeDeviceById(deviceId: string): Promise<void> {
+		await this.deviceMapper.remove({ id: deviceId });
+	}
+
 	async allDevices(): Promise<Device[]> {
 		const result = await this.deviceMapper.findAll();
 		return result.toArray();
