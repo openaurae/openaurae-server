@@ -174,6 +174,7 @@ export class Database {
 				},
 				{
 					fields: ["id", "last_record"],
+					ifExists: true,
 				},
 			);
 		}
@@ -190,6 +191,7 @@ export class Database {
 				{ ...sensor, last_record: reading.time },
 				{
 					fields: ["device", "type", "id", "last_record"],
+					ifExists: true,
 				},
 			);
 		}

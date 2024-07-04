@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
+import { types } from "cassandra-driver";
 import { eachDayOfInterval, formatISO } from "date-fns";
 import {
 	type Device,
@@ -8,6 +9,7 @@ import {
 	db,
 	sensorTypes,
 } from "../database";
+import LocalDate = types.LocalDate;
 
 /**
  * GraphQL API of the app deployed in an AWS EKS cluster.
@@ -17,9 +19,14 @@ const api: AxiosInstance = axios.create({
 	timeout: 20_000,
 });
 
+type _Reading = Omit<Reading, "date" | "time"> & {
+	date: string;
+	time: string;
+};
+
 type QueryReadingsResult = {
 	data: {
-		readings: Reading[];
+		readings: _Reading[];
 	};
 };
 
@@ -78,7 +85,11 @@ const queryReadings = async (
 }
 `,
 	});
-	return resp.data.data.readings;
+	return resp.data.data.readings.map((reading) => ({
+		...reading,
+		date: LocalDate.fromString(reading.date),
+		time: new Date(reading.time),
+	}));
 };
 
 type DeviceWithSensors = Device & { sensors: Sensor[] };
@@ -121,16 +132,23 @@ const migrateDeviceReadings = async (
 	start: string | Date,
 	end: string | Date,
 ): Promise<void> => {
-	const dates = eachDayOfInterval({ start, end }).map((date) =>
-		formatISO(date, { representation: "date" }),
-	);
+	const dates = eachDayOfInterval({ start, end })
+		.reverse()
+		.map((date) => formatISO(date, { representation: "date" }));
 
 	for (const date of dates) {
 		for (const type of sensorTypes) {
 			const readings = await queryReadings(deviceId, type, date);
 
 			for (const reading of readings) {
-				console.log(reading);
+				if (!reading.sensor_id) {
+					console.log(
+						`new schema uses sensor_id as CK but this record doesn't have one: ${reading.device}, ${reading.reading_type}, ${reading.time}`,
+					);
+					continue;
+				}
+
+				// console.log(reading);
 				await db.insertReading(reading);
 			}
 		}
