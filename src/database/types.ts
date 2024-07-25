@@ -47,6 +47,7 @@ export interface Reading {
 	cf_pm1?: number;
 	cf_pm10?: number;
 	cf_pm25?: number;
+	// Formaldehyde (µg/m3)
 	ch2o?: number;
 	co2?: number;
 	consumption?: number;
@@ -63,9 +64,14 @@ export interface Reading {
 	pd100g?: number;
 	pd25?: number;
 	pd50?: number;
+	// Particulate matter 1 (µg/m3)
 	pm1?: number;
+	// Particulate matter 10 (µg/m3)
 	pm10?: number;
+	// Particulate matter 2.5 (µg/m3)
 	pm25?: number;
+	// Particulate matter 4 (µg/m3)
+	pm4?: number;
 	pmv10?: number;
 	pmv100?: number;
 	pmv25?: number;
@@ -73,9 +79,14 @@ export interface Reading {
 	pmvtotal?: number;
 	power?: number;
 	state?: string;
+	// Temperature (°C)
 	temperature?: number;
 	tvoc?: number;
 	voltage?: number;
+	// Light Volatile Organic Compounds (ppb)
+	lvocs?: number;
+	// Pressure (mb)
+	pressure?: number;
 }
 
 export interface Correction {
@@ -93,6 +104,7 @@ export const sensorTypes = [
 	"zigbee_contact",
 	"zigbee_vibration",
 	"zigbee_power",
+	"nemo_cloud",
 ] as const;
 
 export const SensorTypeParser = z.enum(sensorTypes);
