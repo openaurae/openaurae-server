@@ -12,8 +12,10 @@ import LocalDate = types.LocalDate;
 import { chunks, retryUntilSuccess } from "utils";
 
 const columnMapping: Record<string, keyof Reading> = {
+	Battery: "battery",
+	Formaldehyde: "ch2o",
 	Temperature: "temperature",
-	Humidity: "humidity", // relate humidity (Rh%),
+	Humidity: "humidity", // relative humidity (Rh%),
 	Pressure: "pressure",
 	"Carbon dioxide": "co2",
 	"Light Volatile Organic Compounds": "lvocs",
@@ -21,17 +23,15 @@ const columnMapping: Record<string, keyof Reading> = {
 	"Particulate matter 2.5": "pm25",
 	"Particulate matter 4": "pm4",
 	"Particulate matter 10": "pm10",
-	Formaldehyde: "ch2o",
-	Battery: "battery",
 };
 
-export interface MigrateOpts {
+export interface MigrateNemoOpts {
 	start?: Date;
 	end?: Date;
 	taskNum?: number;
 }
 
-export async function migrate(cloud: NemoCloud, opts?: MigrateOpts) {
+export async function migrate(cloud: NemoCloud, opts?: MigrateNemoOpts) {
 	const { start, end, taskNum = 20 } = opts || {};
 
 	const session = cloud.newSession();
@@ -118,7 +118,7 @@ class DeviceMigrationTask {
 		}
 
 		console.log(
-			`finished device serial: ${deviceSerialNum}, measure set bid: ${measureSet.bid}`,
+			`[Nemo migration] finished ${JSON.stringify({ deviceSerialNum, measureSetBid: measureSet.bid })}`,
 		);
 	}
 

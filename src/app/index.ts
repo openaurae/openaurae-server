@@ -8,7 +8,6 @@ import { exportApi } from "./csv";
 import { deviceApi } from "./devices";
 import { metricsApi } from "./metrics";
 import { auth0 } from "./middleware";
-import { migrationApi } from "./migrate";
 import type { ApiEnv } from "./types";
 
 export const app = new Hono<ApiEnv>();
@@ -43,6 +42,5 @@ const api = app.basePath("/api/v1");
 
 api.route("/devices", deviceApi);
 api.route("/metrics", metricsApi);
-api.route("/migrate", migrationApi);
 api.route("/export", exportApi);
 api.route("/corrections", correctionApi);

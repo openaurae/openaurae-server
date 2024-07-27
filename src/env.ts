@@ -1,11 +1,26 @@
 type ProcessEnv = {
+	PORT?: string;
+
+	CASSANDRA_HOST?: string;
+	CASSANDRA_KEYSPACE?: string;
+
 	AUTH0_SECRET?: string;
 	AUTH0_ISSUER?: string;
 	AUTH0_AUDIENCE?: string;
-	PORT?: string;
-	CASSANDRA_HOST?: string;
-	CASSANDRA_KEYSPACE?: string;
+
 	MQTT_BROKER?: string;
+	MQTT_USERNAME?: string;
+	MQTT_PASSWORD?: string;
+
+	NEMO_URL: string;
+	NEMO_OPERATOR: string;
+	NEMO_PASSWORD: string;
+	NEMO_COMPANY: string;
+
+	NEMO_S5_URL: string;
+	NEMO_S5_OPERATOR: string;
+	NEMO_S5_PASSWORD: string;
+	NEMO_S5_COMPANY: string;
 };
 
 // https://www.typescriptlang.org/docs/handbook/declaration-merging.html#merging-interfaces

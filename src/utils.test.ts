@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { chunks } from "./utils.ts";
+import { chunks, formatISODate } from "utils";
 
 // bun test src/utils.test.ts
 describe("test chunks", () => {
@@ -24,5 +24,14 @@ describe("test chunks", () => {
 	it("should handle empty array", () => {
 		const result = chunks([], 2);
 		expect(result).toEqual([]);
+	});
+});
+
+describe("test format ISO date", () => {
+	it("should format Date to date string", () => {
+		const date = new Date("2024-07-27T07:36:57.604Z");
+		const result = formatISODate(date);
+
+		expect(result).toEqual("2024-07-27");
 	});
 });
