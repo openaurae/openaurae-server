@@ -4,13 +4,13 @@ import type {
 	Measure,
 	MeasureSet,
 	NemoCloud,
+	NemoCloudSession,
 	Device as NemoDevice,
 	Value,
 } from "service/nemo";
 import LocalDate = types.LocalDate;
-import { chunks } from "utils";
+import { chunks, retryUntilSuccess } from "utils";
 
-// bun run src/migration/nemo.ts
 const columnMapping: Record<string, keyof Reading> = {
 	Temperature: "temperature",
 	Humidity: "humidity", // relate humidity (Rh%),
@@ -25,37 +25,72 @@ const columnMapping: Record<string, keyof Reading> = {
 	Battery: "battery",
 };
 
-export class Migration {
-	private readonly cloud: NemoCloud;
+export interface MigrateOpts {
+	start?: Date;
+	end?: Date;
+	taskNum?: number;
+}
 
-	public constructor(cloud: NemoCloud) {
-		this.cloud = cloud;
+export async function migrate(cloud: NemoCloud, opts?: MigrateOpts) {
+	const { start, end, taskNum = 20 } = opts || {};
+
+	const session = cloud.newSession();
+	const allDevices = await retryUntilSuccess(() => session.devices());
+
+	for (const devices of chunks(allDevices, taskNum)) {
+		await Promise.all(
+			devices
+				.map(
+					(device) =>
+						new DeviceMigrationTask(cloud.newSession(), device, start, end),
+				)
+				.map((task) => task.migrate()),
+		);
+	}
+}
+
+class DeviceMigrationTask {
+	private readonly session: NemoCloudSession;
+	private readonly device: NemoDevice;
+	private readonly start?: number;
+	private readonly end?: number;
+
+	public constructor(
+		session: NemoCloudSession,
+		device: NemoDevice,
+		start?: Date,
+		end?: Date,
+	) {
+		this.session = session;
+		this.device = device;
+		this.start = start ? start.getTime() / 1000 : undefined;
+		this.end = end ? end.getTime() / 1000 : undefined;
 	}
 
 	public async migrate(): Promise<void> {
-		const session = this.cloud.newSession();
-		const allDevices = await session.devices();
-
-		for (const devices of chunks(allDevices, 10)) {
-			await Promise.all(
-				devices.map(async (device) => this.migrateDevice(device)),
-			);
-		}
-	}
-
-	private async migrateDevice(device: NemoDevice): Promise<void> {
 		await db.upsertDevice({
-			id: device.serial,
-			name: device.name,
+			id: this.device.serial,
+			name: this.device.name,
 			sensor_types: ["nemo_cloud"],
 		});
 
-		const session = this.cloud.newSession();
+		const deviceMeasureSets = await retryUntilSuccess(() =>
+			this.session.measureSets({
+				deviceSerialNumber: this.device.serial,
+				start: this.start,
+				end: this.end,
+			}),
+		);
 
-		const [{ measureSets }] = await session.measureSets(device.serial);
+		if (deviceMeasureSets.length === 0) {
+			return;
+		}
+
+		// device serial num is specified so should have only one object for the device
+		const [{ measureSets }] = deviceMeasureSets;
 
 		for (const measureSet of measureSets) {
-			await this.migrateMeasureSet(device.serial, measureSet);
+			await this.migrateMeasureSet(this.device.serial, measureSet);
 		}
 	}
 
@@ -63,11 +98,8 @@ export class Migration {
 		deviceSerialNum: string,
 		measureSet: MeasureSet,
 	): Promise<void> {
-		const session = this.cloud.newSession();
-		const sensor = await session.sensor(measureSet.bid);
-
-		console.log(
-			`device serial: ${deviceSerialNum}, measure set bid: ${measureSet.bid}`,
+		const sensor = await retryUntilSuccess(() =>
+			this.session.sensor(measureSet.bid),
 		);
 
 		await db.insertSensor({
@@ -77,12 +109,16 @@ export class Migration {
 			type: "nemo_cloud",
 		});
 
-		const measures = await session.measures(measureSet.bid);
+		const measures = await retryUntilSuccess(() =>
+			this.session.measures(measureSet.bid),
+		);
 
-		await Promise.all(
-			measures.map((measure) =>
-				this.migrateMeasure(deviceSerialNum, sensor.serial, measure),
-			),
+		for (const measure of measures) {
+			await this.migrateMeasure(deviceSerialNum, sensor.serial, measure);
+		}
+
+		console.log(
+			`finished device serial: ${deviceSerialNum}, measure set bid: ${measureSet.bid}`,
 		);
 	}
 
@@ -97,8 +133,13 @@ export class Migration {
 			return;
 		}
 
-		const session = this.cloud.newSession();
-		const values = await session.values(measure.measureBid);
+		if (!Object.hasOwn(columnMapping, name)) {
+			throw Error(`column mapping not found for variable name: ${name}`);
+		}
+
+		const values = await retryUntilSuccess(() =>
+			this.session.values(measure.measureBid),
+		);
 
 		for (const value of values) {
 			await this.migrateMeasureValue(

@@ -10,6 +10,15 @@ export interface InitParams {
 
 type LoginParams = Omit<InitParams, "url">;
 
+export interface MeasureSetQuery {
+	// The device’s serial number as returned by the /devices/ endpoint
+	deviceSerialNumber?: string;
+	// The start time of the measureSet realize by the device, in seconds since the UnixEpoch
+	start?: number;
+	// The end time of the measureSet realize by the device, in seconds since the UnixEpoch
+	end?: number;
+}
+
 export class NemoCloud {
 	private readonly httpClient: AxiosInstance;
 	private readonly loginParams: LoginParams;
@@ -18,7 +27,7 @@ export class NemoCloud {
 		this.loginParams = { operator: operator, password, company };
 		this.httpClient = axios.create({
 			baseURL: `${url}/AirQualityAPI`,
-			timeout: 30_000,
+			timeout: 120_000,
 			headers: {
 				"Accept-version": "v4",
 			},
@@ -30,7 +39,7 @@ export class NemoCloud {
 	}
 }
 
-class NemoCloudSession {
+export class NemoCloudSession {
 	private readonly httpClient: AxiosInstance;
 	private readonly loginParams: LoginParams;
 	private id = "";
@@ -87,12 +96,32 @@ class NemoCloudSession {
 	}
 
 	/**
+	 * Get information measure about a device, the name, the serial, the bid, the associated operator,
+	 * the device's comment, the last campaign bid associated to the device, the last room bid associated to the device,
+	 * the first measureSet, the last measureSet and the number of measureSet for a specific device.
+	 *
+	 * The values returned correspond to the data to which the operator is associated.
+	 * @param deviceSerialNumber
+	 */
+	public async device(deviceSerialNumber: string): Promise<Device> {
+		const resp = await this.httpClient.get<Device>(
+			`/devices/${deviceSerialNumber}`,
+			{
+				headers: {
+					sessionId: await this.sessionId(),
+				},
+			},
+		);
+
+		return resp.data;
+	}
+
+	/**
 	 * Get a measureSet list by device. The values returned correspond to the data to which the operator is associated.
 	 *
-	 * @param deviceSerialNumber The device’s serial number as returned by the /devices/ endpoint
 	 */
 	public async measureSets(
-		deviceSerialNumber?: string,
+		query: MeasureSetQuery,
 	): Promise<DeviceMeasureSets[]> {
 		const resp = await this.httpClient.get<DeviceMeasureSets[]>(
 			"/measureSets/",
@@ -100,12 +129,11 @@ class NemoCloudSession {
 				headers: {
 					sessionId: await this.sessionId(),
 				},
-				params: {
-					deviceSerialNumber,
-				},
+				params: query,
 			},
 		);
-		return resp.data;
+
+		return resp.status === 204 ? [] : resp.data;
 	}
 
 	/**

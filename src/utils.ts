@@ -1,3 +1,5 @@
+import retry from "async-retry";
+
 export function chunks<T>(array: T[], size = 10): T[][] {
 	if (array.length === 0) {
 		return [];
@@ -10,4 +12,13 @@ export function chunks<T>(array: T[], size = 10): T[][] {
 	}
 
 	return chunks;
+}
+
+export async function retryUntilSuccess<T>(f: () => Promise<T>): Promise<T> {
+	return retry(f, {
+		forever: true,
+		onRetry: (err) => {
+			console.log(err);
+		},
+	});
 }
