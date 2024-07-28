@@ -21,27 +21,27 @@ measuresApi.get(
 			name: measuresSchema.keyof(),
 			processed: z.coerce.boolean().default(true),
 			page: z.coerce.number().positive().optional().default(1),
-			count: z.coerce.number().positive().optional().default(1000),
+			count: z.coerce.number().positive().optional(),
 			order: z.enum(["asc", "desc"]),
 		}),
 	),
 	async (c) => {
 		const { name, page, count, order, ...params } = c.req.valid("query");
-		const offset = (page - 1) * count;
 
 		let measures = await db.readings.getMeasuresByKey(name, params); // ordered by time desc
+		measures = measures.filter((measure) => measure[name] !== null);
+
+		const n = count || measures.length;
+		const offset = (page - 1) * n;
 
 		if (order === "asc") {
 			measures = measures.reverse();
 		}
 
-		measures = measures
-			.filter((measure) => measure[name] !== null)
-			.slice(offset, offset + count)
-			.map((measure) => ({
-				...measure,
-				value: measure[name],
-			}));
+		measures = measures.slice(offset, offset + n).map((measure) => ({
+			...measure,
+			value: measure[name],
+		}));
 
 		return c.json(measures);
 	},
