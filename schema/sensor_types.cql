@@ -10,6 +10,8 @@ VALUES ('zigbee_temp', {'temperature'});
 INSERT INTO aurae.sensor_type (id, measures)
 VALUES ('zigbee_occupancy', {'occupancy'});
 INSERT INTO aurae.sensor_type (id, measures)
+VALUES ('zigbee_contact', {'contact'});
+INSERT INTO aurae.sensor_type (id, measures)
 VALUES ('zigbee_power', {'power'});
 INSERT INTO aurae.sensor_type (id, measures)
 VALUES ('zigbee_vibration', {'angle'});
