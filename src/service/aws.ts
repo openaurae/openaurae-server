@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
 import { types } from "cassandra-driver";
-import type { Device, Reading, Sensor, SensorType } from "database";
+import type { Device, Reading, Sensor } from "database/types";
 import LocalDate = types.LocalDate;
 
 type _Reading = Omit<Reading, "date" | "time"> & {
@@ -37,7 +37,7 @@ export class AwsOpenAurae {
 
 	public async queryReadings(
 		deviceId: string,
-		type: SensorType,
+		type: string,
 		date: string,
 		processed = true,
 	): Promise<Reading[]> {

@@ -1,7 +1,7 @@
+import type { DeviceApiEnv } from "app/types";
+import { db } from "database";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { db } from "../../database";
-import type { DeviceApiEnv } from "../types.ts";
 
 /**
  * Check device ownership by device id in path variable or query params.
@@ -18,15 +18,15 @@ export const checkDeviceOwnership = ({ required } = { required: true }) =>
 
 		if (deviceId) {
 			const { userId, canReadAll } = c.get("user");
-			const device = await db.getDeviceById(deviceId);
+			const device = await db.devices.getById(deviceId);
 
 			if (!device) {
 				return c.notFound();
 			}
 
-			const deviceIds = await db.userDeviceIds(userId);
+			const user = await db.users.getById(userId);
 
-			if (!canReadAll && !deviceIds.includes(deviceId)) {
+			if (!canReadAll && !user.devices.includes(deviceId)) {
 				throw new HTTPException(401, {
 					message: "Only admin or device owner can access this device.",
 				});

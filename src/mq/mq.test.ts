@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { types } from "cassandra-driver";
-import { messageToReading, parseTopic } from "./parser";
+import { messageToReading, parseTopic } from "mq/parser";
 import LocalDate = types.LocalDate;
 
 describe("test topic parsing", () => {

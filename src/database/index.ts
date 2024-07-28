@@ -1,26 +1,26 @@
 import * as cassandra from "cassandra-driver";
-import { cassandraHost, cassandraKeyspace } from "../env";
-import type {
-	Correction,
-	Device,
-	Reading,
-	Sensor,
-	SensorType,
-	User,
-} from "./types";
-
-type ModelMapper<T> = cassandra.mapping.ModelMapper<T>;
-const q = cassandra.mapping.q;
-const MIN_DATE = new Date(0);
+import {
+	Corrections,
+	Devices,
+	MeasureMetas,
+	Readings,
+	SensorTypes,
+	Sensors,
+	Users,
+} from "database/tables";
+import { cassandraHost, cassandraKeyspace } from "env";
 
 export class Database {
 	private readonly client: cassandra.Client;
 	private readonly mapper: cassandra.mapping.Mapper;
-	private readonly userMapper: ModelMapper<User>;
-	private readonly deviceMapper: ModelMapper<Device>;
-	private readonly sensorMapper: ModelMapper<Sensor>;
-	private readonly readingMapper: ModelMapper<Reading>;
-	private readonly correctionMapper: ModelMapper<Correction>;
+
+	public readonly devices: Devices;
+	public readonly sensors: Sensors;
+	public readonly readings: Readings;
+	public readonly users: Users;
+	public readonly sensorTypes: SensorTypes;
+	public readonly measureMetas: MeasureMetas;
+	public readonly corrections: Corrections;
 
 	constructor(host: string, keyspace: string) {
 		this.client = new cassandra.Client({
@@ -35,250 +35,26 @@ export class Database {
 				Sensor: { tables: ["sensor"] },
 				Reading: { tables: ["reading"] },
 				Correction: { tables: ["correction"] },
+				MeasureMetadata: { tables: ["measure_metadata"] },
+				SensorType: { tables: ["sensor_type"] },
 			},
 		});
-		this.userMapper = this.mapper.forModel<User>("User");
-		this.deviceMapper = this.mapper.forModel<Device>("Device");
-		this.sensorMapper = this.mapper.forModel<Sensor>("Sensor");
-		this.readingMapper = this.mapper.forModel<Reading>("Reading");
-		this.correctionMapper = this.mapper.forModel<Correction>("Correction");
+		this.users = new Users(this.mapper);
+		this.sensors = new Sensors(this.mapper);
+		this.devices = new Devices(this.mapper, this.users);
+		this.readings = new Readings(this.mapper, this.devices, this.sensors);
+		this.sensorTypes = new SensorTypes(this.mapper);
+		this.measureMetas = new MeasureMetas(this.mapper, this.sensorTypes);
+		this.corrections = new Corrections(this.mapper, this.users);
 	}
 
-	async connect(): Promise<void> {
+	public async connect(): Promise<void> {
 		await this.client.connect();
 	}
 
-	async shutdown(): Promise<void> {
+	public async shutdown(): Promise<void> {
 		await this.client.shutdown();
 	}
-
-	async getUser(userId: string): Promise<User | null> {
-		return await this.userMapper.get({ id: userId });
-	}
-
-	async upsertDevice(device: Device): Promise<void> {
-		await this.deviceMapper.insert(device);
-	}
-
-	async removeDeviceById(deviceId: string): Promise<void> {
-		await this.deviceMapper.remove({ id: deviceId });
-	}
-
-	async allDevices(): Promise<Device[]> {
-		const result = await this.deviceMapper.findAll();
-		return result.toArray();
-	}
-
-	async userDevices(userId: string): Promise<Device[]> {
-		const deviceIds = await this.userDeviceIds(userId);
-
-		if (!deviceIds) {
-			return [];
-		}
-
-		const result = await this.deviceMapper.find({
-			id: q.in_(deviceIds),
-		});
-		return result.toArray();
-	}
-
-	async getDeviceById(deviceId: string): Promise<Device | null> {
-		return await this.deviceMapper.get({ id: deviceId });
-	}
-
-	async userDeviceIds(userId: string): Promise<string[]> {
-		const user = await this.getUser(userId);
-		return user?.devices ?? [];
-	}
-
-	async getSensor(
-		device: string,
-		type: SensorType,
-		sensorId: string,
-	): Promise<Sensor | null> {
-		return await this.sensorMapper.get({
-			device,
-			type,
-			id: sensorId,
-		});
-	}
-
-	async deviceSensors(deviceId: string): Promise<Sensor[]> {
-		const result = await this.sensorMapper.find({
-			device: deviceId,
-		});
-		return result.toArray();
-	}
-
-	async sensorMetrics({
-		deviceId,
-		date,
-		processed,
-		sensorId,
-		metric,
-		sensorType,
-		limit,
-		order,
-	}: SensorMetricsProps): Promise<Reading[]> {
-		const asc = order === "asc";
-
-		const result = await this.readingMapper.find(
-			{
-				device: deviceId,
-				date: date,
-				reading_type: sensorType,
-				sensor_id: sensorId,
-				processed,
-			},
-			{
-				fields: ["time", metric],
-				orderBy: {
-					reading_type: "asc",
-					sensor_id: "asc",
-					processed: "asc",
-					time: "desc",
-				},
-				limit: asc ? undefined : limit,
-			},
-		);
-		const metrics = result.toArray().reverse();
-		return asc ? metrics.slice(0, limit) : metrics;
-	}
-
-	async insertSensor(sensor: Sensor): Promise<void> {
-		await this.sensorMapper.insert(sensor);
-		await this.addDeviceSensorType(sensor.device, sensor.type);
-	}
-
-	/**
-	 * Insert a reading record, update `last_record` of related device and sensor
-	 * if needed.
-	 *
-	 * @param reading
-	 * @see https://docs.datastax.com/en/cql-oss/3.3/cql/cql_reference/cqlUpdate.html
-	 */
-	async insertReading(reading: Reading): Promise<void> {
-		await this.readingMapper.insert(reading);
-
-		const device = await this.getDeviceById(reading.device);
-		const deviceLastUpdate = device?.last_record ?? MIN_DATE;
-
-		// update device.last_record if is null or < reading time
-		// not using CQL because OR statements are not supported
-		// (update ... if exists and (last_record is null or last_record < ?))
-		if (device && deviceLastUpdate < reading.time) {
-			await this.deviceMapper.update(
-				{
-					id: device.id,
-					last_record: reading.time,
-				},
-				{
-					fields: ["id", "last_record"],
-					ifExists: true,
-				},
-			);
-		}
-
-		const sensor = await this.getSensor(
-			reading.device,
-			reading.reading_type,
-			reading.sensor_id,
-		);
-		const sensorLastUpdate = sensor?.last_record ?? MIN_DATE;
-
-		if (sensor && sensorLastUpdate < reading.time) {
-			await this.sensorMapper.update(
-				{ ...sensor, last_record: reading.time },
-				{
-					fields: ["device", "type", "id", "last_record"],
-					ifExists: true,
-				},
-			);
-		}
-	}
-
-	async deviceReadings(deviceId: string, date: Date): Promise<Reading[]> {
-		const result = await this.readingMapper.find({
-			device: deviceId,
-			date,
-		});
-		return result.toArray();
-	}
-
-	async allCorrections(): Promise<Correction[]> {
-		const result = await this.correctionMapper.findAll();
-		return result.toArray();
-	}
-
-	async userCorrections(userId: string): Promise<Correction[]> {
-		const deviceIds = await this.userDeviceIds(userId);
-		const result = await this.correctionMapper.find({
-			device: q.in_(deviceIds),
-		});
-		return result.toArray();
-	}
-
-	async deviceCorrections(deviceId: string): Promise<Correction[]> {
-		const result = await this.correctionMapper.find({
-			device: deviceId,
-		});
-		return result.toArray();
-	}
-
-	async sensorCorrections(
-		deviceId: string,
-		sensorType: SensorType,
-	): Promise<Correction[]> {
-		const result = await this.correctionMapper.find({
-			device: deviceId,
-			reading_type: sensorType,
-		});
-		return result.toArray();
-	}
-
-	/**
-	 * Add target sensor type to the device record.
-	 *
-	 * @param deviceId device id
-	 * @param sensorType sensor type
-	 * @private
-	 * @see https://docs.datastax.com/en/cql-oss/3.3/cql/cql_reference/cqlUpdate.html#Updatingaset
-	 */
-	private async addDeviceSensorType(
-		deviceId: string,
-		sensorType: SensorType,
-	): Promise<void> {
-		const cqlUpdateSensorType =
-			"UPDATE device SET sensor_types = sensor_types + ? WHERE id = ? IF EXISTS;";
-
-		await this.client.execute(cqlUpdateSensorType, [[sensorType], deviceId], {
-			prepare: true,
-		});
-	}
-}
-
-export interface SensorMetricsProps {
-	deviceId: string;
-	sensorId: string;
-	sensorType: SensorType;
-	metric: string;
-	processed: boolean;
-	limit?: number;
-	date: Date;
-	order: "asc" | "desc";
 }
 
 export const db = new Database(cassandraHost, cassandraKeyspace);
-export type {
-	Correction,
-	Device,
-	Reading,
-	Sensor,
-	User,
-	SensorType,
-	MetricName,
-	Metric,
-	Metrics,
-} from "./types";
-
-export { SensorTypeParser, sensorTypes } from "./types";

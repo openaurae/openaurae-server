@@ -1,7 +1,6 @@
+import type { Device } from "database/types";
 import type { Env } from "hono";
 import type { JwtPayload } from "jsonwebtoken";
-import { z } from "zod";
-import type { Device } from "../database";
 
 export type ContextVariables = Record<string, unknown>;
 
@@ -53,19 +52,3 @@ export interface DeviceVariables extends ContextVariables {
  * Device ids in apis should be verified existence and ownership.
  */
 export type DeviceApiEnv = HonoEnv<Auth0Variables & DeviceVariables>;
-
-export const MetricNameParser = z.enum([
-	"temperature",
-	"pm25",
-	"tvoc",
-	"ch2o",
-	"occupancy",
-	"contact",
-	"angle",
-	"power",
-]);
-
-/**
- * Metrics displayed as chart in client.
- */
-export type MetricName = z.infer<typeof MetricNameParser>;

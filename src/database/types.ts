@@ -1,6 +1,9 @@
-import { types } from "cassandra-driver";
-import LocalDate = types.LocalDate;
+import { type mapping, types } from "cassandra-driver";
 import { z } from "zod";
+import LocalDate = types.LocalDate;
+
+export type Mapper = mapping.Mapper;
+export type ModelMapper<T> = mapping.ModelMapper<T>;
 
 export interface User {
 	id: string;
@@ -17,104 +20,108 @@ export interface Device {
 }
 
 /**
- * Note: `id` is not unique because some devices share the same sensor
+ * Note: `id` is not unique in previous `ptqs1005` records
  */
 export interface Sensor {
 	id: string;
 	device: string;
-	type: SensorType;
+	type: string;
 	name?: string;
 	comments?: string;
 	last_record?: Date;
 }
 
-export interface Reading {
-	device: string;
-	date: LocalDate;
-	reading_type: SensorType;
-	sensor_id: string;
-	processed: boolean;
-	time: Date;
+export type SensorKey = Pick<Sensor, "id" | "device" | "type">;
 
-	action?: string;
-	angle?: number;
-	angle_x?: number;
-	angle_x_absolute?: number;
-	angle_y?: number;
-	angle_y_absolute?: number;
-	angle_z?: number;
-	battery?: number;
-	cf_pm1?: number;
-	cf_pm10?: number;
-	cf_pm25?: number;
-	// Formaldehyde (µg/m3)
-	ch2o?: number;
-	co2?: number;
-	consumption?: number;
-	contact?: boolean;
-	humidity?: number;
-	illuminance?: number;
-	ip_address?: string;
-	latitude?: number;
-	longitude?: number;
-	occupancy?: boolean;
-	pd05?: number;
-	pd10?: number;
-	pd100?: number;
-	pd100g?: number;
-	pd25?: number;
-	pd50?: number;
-	// Particulate matter 1 (µg/m3)
-	pm1?: number;
-	// Particulate matter 10 (µg/m3)
-	pm10?: number;
-	// Particulate matter 2.5 (µg/m3)
-	pm25?: number;
-	// Particulate matter 4 (µg/m3)
-	pm4?: number;
-	pmv10?: number;
-	pmv100?: number;
-	pmv25?: number;
-	pmv_total?: number;
-	pmvtotal?: number;
-	power?: number;
-	state?: string;
-	// Temperature (°C)
-	temperature?: number;
-	tvoc?: number;
-	voltage?: number;
-	// Light Volatile Organic Compounds (ppb)
-	lvocs?: number;
-	// Pressure (mb)
-	pressure?: number;
-}
+export const readingSchema = z.object({
+	// PK
+	device: z.string().describe("device id"),
+	date: z.instanceof(LocalDate),
+	// CK
+	reading_type: z.string().describe("sensor type"),
+	sensor_id: z.string(),
+	processed: z.boolean().describe("whether applied corrections"),
+	time: z.date(),
+
+	// measures
+	action: z.string().optional(),
+	angle: z.number().optional(),
+	angle_x: z.number().optional(),
+	angle_x_absolute: z.number().optional(),
+	angle_y: z.number().optional(),
+	angle_y_absolute: z.number().optional(),
+	angle_z: z.number().optional(),
+	battery: z.number().optional(),
+	cf_pm1: z.number().optional(),
+	cf_pm10: z.number().optional(),
+	cf_pm25: z.number().optional(),
+	ch2o: z.number().optional().describe("Formaldehyde (µg/m3)"),
+	co2: z.number().optional(),
+	consumption: z.number().optional(),
+	contact: z.boolean().optional(),
+	humidity: z.number().optional(),
+	illuminance: z.number().optional(),
+	ip_address: z.string().optional(),
+	latitude: z.number().optional(),
+	longitude: z.number().optional(),
+	occupancy: z.boolean().optional(),
+	pd05: z.number().optional(),
+	pd10: z.number().optional(),
+	pd100: z.number().optional(),
+	pd100g: z.number().optional(),
+	pd25: z.number().optional(),
+	pd50: z.number().optional(),
+	pm1: z.number().optional().describe("Particulate matter 1 (µg/m3)"),
+	pm10: z.number().optional().describe("Particulate matter 10 (µg/m3)"),
+	pm25: z.number().optional().describe("Particulate matter 2.5 (µg/m3)"),
+	pm4: z.number().optional().describe("Particulate matter 4 (µg/m3)"),
+	pmv10: z.number().optional(),
+	pmv100: z.number().optional(),
+	pmv25: z.number().optional(),
+	pmv_total: z.number().optional(),
+	pmvtotal: z.number().optional(),
+	power: z.number().optional(),
+	state: z.string().optional(),
+	temperature: z.number().optional().describe("Temperature (°C)"),
+	tvoc: z.number().optional(),
+	voltage: z.number().optional(),
+	lvocs: z
+		.number()
+		.optional()
+		.describe("Light Volatile Organic Compounds (ppb)"),
+	pressure: z.number().optional().describe("Pressure (mb)"),
+});
+
+export type Reading = z.infer<typeof readingSchema>;
+
+export const measuresSchema = readingSchema.omit({
+	device: true,
+	date: true,
+	reading_type: true,
+	sensor_id: true,
+	processed: true,
+	time: true,
+});
+
+export type Measures = z.infer<typeof measuresSchema>;
+
+export type Measure<T extends keyof Measures> = Pick<Reading, "time" | T>;
 
 export interface Correction {
 	device: string;
-	reading_type: SensorType;
-	metric: keyof Metrics;
+	reading_type: string;
+	metric: keyof Measures;
 	expression: string;
 }
 
-export const sensorTypes = [
-	"ptqs1005",
-	"pms5003st",
-	"zigbee_temp",
-	"zigbee_occupancy",
-	"zigbee_contact",
-	"zigbee_vibration",
-	"zigbee_power",
-	"nemo_cloud",
-] as const;
+export interface SensorType {
+	id: string;
+	measures: string[];
+}
 
-export const SensorTypeParser = z.enum(sensorTypes);
-export type SensorType = z.infer<typeof SensorTypeParser>;
-
-export type Metrics = Omit<
-	Reading,
-	"reading_type" | "device" | "sensor_id" | "date" | "time" | "processed"
->;
-export type MetricName = keyof Metrics;
-export type Metric<T extends MetricName> = {
-	[key in T]: Metrics[T];
-};
+export interface MeasureMetadata {
+	id: string;
+	name: string;
+	unit?: string;
+	is_bool: boolean;
+}

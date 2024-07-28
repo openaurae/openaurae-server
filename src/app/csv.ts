@@ -1,13 +1,13 @@
 import { Readable } from "node:stream";
 import { zValidator } from "@hono/zod-validator";
+import { auth0, checkDeviceOwnership } from "app/middleware";
+import type { ApiEnv } from "app/types";
 import { stringify } from "csv";
+import { db } from "database";
 import { eachDayOfInterval } from "date-fns";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
-import { db } from "../database";
-import { auth0, checkDeviceOwnership } from "./middleware";
-import type { ApiEnv } from "./types";
 
 export const exportApi = new Hono<ApiEnv>();
 
@@ -26,19 +26,6 @@ exportApi.get(
 	async (c) => {
 		const { deviceId, start, end } = c.req.valid("query");
 
-		const getReadings = async function* () {
-			for (const date of eachDayOfInterval({ start, end })) {
-				const readings = await db.deviceReadings(deviceId, date);
-				for (const reading of readings) {
-					yield {
-						...reading,
-						date: reading.date.toString(),
-						time: reading.time.toISOString(),
-					};
-				}
-			}
-		};
-
 		const stringifier = stringify({
 			header: true,
 			delimiter: ",",
@@ -48,7 +35,7 @@ exportApi.get(
 			c.header("Content-Type", "text/csv");
 			c.header("Content-Disposition", `attachment; filename=\"data.csv\"`);
 
-			Readable.from(getReadings()).pipe(stringifier);
+			Readable.from(deviceReadings(deviceId, start, end)).pipe(stringifier);
 
 			for await (const row of stringifier) {
 				await stream.write(row);
@@ -56,3 +43,16 @@ exportApi.get(
 		});
 	},
 );
+
+async function* deviceReadings(deviceId: string, start: Date, end: Date) {
+	for (const date of eachDayOfInterval({ start, end })) {
+		const readings = await db.readings.getByKey(deviceId, date);
+		for (const reading of readings) {
+			yield {
+				...reading,
+				date: reading.date.toString(),
+				time: reading.time.toISOString(),
+			};
+		}
+	}
+}

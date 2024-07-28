@@ -1,8 +1,8 @@
 import { types } from "cassandra-driver";
 import LocalDate = types.LocalDate;
+import type { Reading } from "database/types";
+import { type Message, type Topic, aliasMapping } from "mq/types";
 import { fromPairs, has, isNotNil, partition } from "ramda";
-import type { Reading, SensorType } from "../database";
-import { type Message, type Topic, aliasMapping } from "./types";
 
 export const parseTopic = (topic: string): Topic => {
 	const matched = topic.match(/^zigbee\/(.+?)\/(.+?)(\/.*)?$/);
@@ -39,7 +39,7 @@ const parseAlias = (reading: Message): Message => {
 	};
 };
 
-const sensorTypeOf = (message: Message): SensorType => {
+const sensorTypeOf = (message: Message): string => {
 	if (message.sensor_id === "ptqs1005") {
 		return "ptqs1005";
 	}

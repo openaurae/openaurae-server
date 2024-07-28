@@ -1,12 +1,14 @@
+import { db } from "database";
+import type { Reading } from "database/types";
+import { mqttBroker } from "env";
 import { parse } from "mathjs";
+import { messageToReading } from "mq/parser";
 import { connectAsync } from "mqtt";
-import { db } from "../database";
-import { mqttBroker } from "../env";
-import { messageToReading } from "./parser";
 
 export const mqttClient = await connectAsync(mqttBroker, {
-	protocol: "mqtt",
-	clientId: "openaurae-server",
+	protocol: "mqtts",
+	username: Bun.env.MQTT_USERNAME,
+	password: Bun.env.MQTT_PASSWORD,
 });
 
 mqttClient.on("message", async (topic, messageBuffer) => {
@@ -14,14 +16,13 @@ mqttClient.on("message", async (topic, messageBuffer) => {
 
 	console.log(`${topic} - ${JSON.stringify(message)}`);
 
-	const reading = messageToReading(topic, message);
+	const reading: Reading = messageToReading(topic, message);
 
-	await db.insertReading(reading);
+	await db.readings.upsert(reading);
 
-	const corrections = await db.sensorCorrections(
-		reading.device,
-		reading.reading_type,
-	);
+	const corrections = (
+		await db.corrections.getByDeviceId(reading.device)
+	).filter((correction) => correction.reading_type === reading.reading_type);
 
 	for (const correction of corrections) {
 		const metricName = correction.metric;
@@ -29,5 +30,5 @@ mqttClient.on("message", async (topic, messageBuffer) => {
 	}
 
 	reading.processed = true;
-	await db.insertReading(reading);
+	await db.readings.upsert(reading);
 });

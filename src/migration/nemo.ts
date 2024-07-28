@@ -1,5 +1,5 @@
 import { types } from "cassandra-driver";
-import { type Reading, db } from "database";
+import { db } from "database";
 import type {
 	Measure,
 	MeasureSet,
@@ -9,9 +9,10 @@ import type {
 	Value,
 } from "service/nemo";
 import LocalDate = types.LocalDate;
+import type { Reading } from "database/types";
 import { chunks, retryUntilSuccess } from "utils";
 
-const columnMapping: Record<string, keyof Reading> = {
+const columnMapping: Record<string, NemoMeasures> = {
 	Battery: "battery",
 	Formaldehyde: "ch2o",
 	Temperature: "temperature",
@@ -24,6 +25,19 @@ const columnMapping: Record<string, keyof Reading> = {
 	"Particulate matter 4": "pm4",
 	"Particulate matter 10": "pm10",
 };
+
+type NemoMeasures =
+	| "battery"
+	| "ch2o"
+	| "co2"
+	| "temperature"
+	| "humidity"
+	| "pressure"
+	| "lvocs"
+	| "pm1"
+	| "pm25"
+	| "pm4"
+	| "pm10";
 
 export interface MigrateNemoOpts {
 	start?: Date;
@@ -68,7 +82,7 @@ class DeviceMigrationTask {
 	}
 
 	public async migrate(): Promise<void> {
-		await db.upsertDevice({
+		await db.devices.upsert({
 			id: this.device.serial,
 			name: this.device.name,
 			sensor_types: ["nemo_cloud"],
@@ -102,7 +116,7 @@ class DeviceMigrationTask {
 			this.session.sensor(measureSet.bid),
 		);
 
-		await db.insertSensor({
+		await db.sensors.upsert({
 			id: sensor.serial,
 			device: deviceSerialNum,
 			name: sensor.refExposition,
@@ -154,7 +168,7 @@ class DeviceMigrationTask {
 	private async migrateMeasureValue(
 		deviceSerialNum: string,
 		sensorSerialNum: string,
-		col: keyof Reading,
+		col: NemoMeasures,
 		{ time, value }: Value,
 	): Promise<void> {
 		if (!value) {
@@ -172,6 +186,6 @@ class DeviceMigrationTask {
 			sensor_id: sensorSerialNum,
 		};
 		reading[col] = value;
-		await db.insertReading(reading);
+		await db.readings.upsert(reading);
 	}
 }

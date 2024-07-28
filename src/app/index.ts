@@ -1,14 +1,15 @@
+import { correctionApi } from "app/corrections";
+import { exportApi } from "app/csv";
+import { deviceApi } from "app/devices";
+import { measuresApi } from "app/measures";
+import { metasApi } from "app/metas";
+import { auth0 } from "app/middleware";
+import type { ApiEnv } from "app/types";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
-import { correctionApi } from "./corrections";
-import { exportApi } from "./csv";
-import { deviceApi } from "./devices";
-import { metricsApi } from "./metrics";
-import { auth0 } from "./middleware";
-import type { ApiEnv } from "./types";
 
 export const app = new Hono<ApiEnv>();
 
@@ -41,6 +42,7 @@ app.get("/health", (c) => {
 const api = app.basePath("/api/v1");
 
 api.route("/devices", deviceApi);
-api.route("/metrics", metricsApi);
+api.route("/measures", measuresApi);
 api.route("/export", exportApi);
 api.route("/corrections", correctionApi);
+api.route("/metadata", metasApi);

@@ -1,12 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
+import { auth0, checkDeviceOwnership } from "app/middleware";
+import type { ApiEnv, DeviceApiEnv } from "app/types";
+import { db } from "database";
+import type { MeasureMetadata, Sensor } from "database/types";
 import { type Context, Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { flatten, uniq } from "ramda";
 import { z } from "zod";
-import { db } from "../database";
-import { metricMetadata, metricNamesBySensorType } from "./common";
-import { auth0, checkDeviceOwnership } from "./middleware";
-import type { ApiEnv, DeviceApiEnv, MetricName } from "./types";
 
 export const deviceApi = new Hono<DeviceApiEnv>();
 
@@ -15,34 +15,41 @@ deviceApi.use(auth0);
 deviceApi.get("/", async (c: Context<ApiEnv>) => {
 	const { canReadAll, userId } = c.get("user");
 	const devices = canReadAll
-		? await db.allDevices()
-		: await db.userDevices(userId);
+		? await db.devices.all()
+		: await db.devices.getByUserId(userId);
 	return c.json(devices);
 });
 
 deviceApi.use("/:deviceId/*", checkDeviceOwnership());
 
+interface SensorWithMetadata extends Sensor {
+	measureMetadata: MeasureMetadata[];
+}
+
 deviceApi.get("/:deviceId", async (c) => {
 	const device = c.get("device");
-	let sensors = await db.deviceSensors(device.id);
+	const sensors: SensorWithMetadata[] = [];
 
-	sensors = sensors.map((sensor) => ({
-		...sensor,
-		metrics: metricNamesBySensorType[sensor.type].map(
-			(metricName) => metricMetadata[metricName],
-		),
-	}));
+	for (const sensor of await db.sensors.getByDeviceId(device.id)) {
+		const measureMetadata = await db.measureMetas.getBySensorType(sensor.type);
+		sensors.push({
+			...sensor,
+			measureMetadata,
+		});
+	}
 
-	const sensorTypes = uniq(sensors.map((sensor) => sensor.type));
-	const metricNames: MetricName[] = flatten(
-		sensorTypes.map((sensorType) => metricNamesBySensorType[sensorType]),
+	const sensorTypes = await db.sensorTypes.getByIds(
+		uniq(sensors.map((sensor) => sensor.type)),
 	);
-	const metadataList = uniq(metricNames).map((name) => metricMetadata[name]);
+	const measures = uniq(
+		flatten(sensorTypes.map((sensorType) => sensorType.measures)),
+	);
+	const measureMetas = await db.measureMetas.getByIds(measures);
 
 	return c.json({
 		...device,
 		sensors,
-		availableMetrics: metadataList,
+		measuresMetadata: measureMetas,
 	});
 });
 
@@ -56,13 +63,11 @@ const deviceSchema = z.object({
 deviceApi.post("/", zValidator("json", deviceSchema), async (c) => {
 	const { id, name, latitude, longitude } = c.req.valid("json");
 
-	const device = await db.getDeviceById(id);
-
-	if (device) {
+	if (await db.devices.exists(id)) {
 		throw new HTTPException(400, { message: "Device id already exists" });
 	}
 
-	await db.upsertDevice({
+	await db.devices.upsert({
 		id,
 		name,
 		longitude,
@@ -80,7 +85,7 @@ deviceApi.put(
 
 		const device = c.get("device");
 
-		await db.upsertDevice({
+		await db.devices.upsert({
 			...device,
 			name,
 			longitude,
@@ -93,7 +98,7 @@ deviceApi.put(
 
 deviceApi.delete("/:deviceId", async (c) => {
 	const device = c.get("device");
-	await db.removeDeviceById(device.id);
+	await db.devices.deleteById(device.id);
 
 	return c.text("device removed, sensor and reading records are still in DB");
 });

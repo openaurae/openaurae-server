@@ -1,9 +1,10 @@
-import { type SensorType, db } from "database";
+import { db } from "database";
 import { eachDayOfInterval } from "date-fns";
-import { AwsOpenAurae } from "service/aws.ts";
+import { uniq } from "ramda";
+import { AwsOpenAurae } from "service/aws";
 import { chunks, formatISODate, retryUntilSuccess } from "utils";
 
-const sensorTypes: SensorType[] = [
+const sensorTypes = [
 	"ptqs1005",
 	"pms5003st",
 	"zigbee_temp",
@@ -31,11 +32,14 @@ export class AwsMigration {
 		const devices = await retryUntilSuccess(() => this.api.queryDevices());
 
 		for (const { sensors, ...device } of devices) {
-			await db.upsertDevice(device);
-
 			for (const sensor of sensors) {
-				await db.insertSensor(sensor);
+				await db.sensors.upsert(sensor);
 			}
+
+			await db.devices.upsert({
+				...device,
+				sensor_types: uniq(sensors.map((sensor) => sensor.type)),
+			});
 		}
 	}
 
@@ -75,7 +79,7 @@ export class AwsMigration {
 				);
 
 				for (const reading of readings) {
-					await db.insertReading(reading);
+					await db.readings.upsert(reading);
 				}
 			}
 		}

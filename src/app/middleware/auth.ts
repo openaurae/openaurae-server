@@ -1,8 +1,8 @@
+import type { ApiEnv, Auth0User, UserClaims } from "app/types";
+import { auth0Audience, auth0Issuer, auth0Secret } from "env";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { verify } from "jsonwebtoken";
-import { auth0Audience, auth0Issuer, auth0Secret } from "../../env";
-import type { ApiEnv, Auth0User, UserClaims } from "../types";
 
 /**
  * Verify access token in user requests and set user info to the Hono context.
@@ -60,7 +60,7 @@ export const auth0Admin = ({ write } = { write: false }) =>
 		await next();
 	});
 
-const verifyToken = (token: string): UserClaims => {
+function verifyToken(token: string): UserClaims {
 	try {
 		return <UserClaims>verify(token, auth0Secret, {
 			algorithms: ["HS256"],
@@ -72,4 +72,4 @@ const verifyToken = (token: string): UserClaims => {
 			message: "Unauthorized",
 		});
 	}
-};
+}

@@ -1,9 +1,7 @@
-import { zValidator } from "@hono/zod-validator";
+import { auth0, checkDeviceOwnership } from "app/middleware";
+import type { ApiEnv } from "app/types";
+import { db } from "database";
 import { Hono } from "hono";
-import { z } from "zod";
-import { SensorTypeParser, db } from "../database";
-import { auth0, checkDeviceOwnership } from "./middleware";
-import type { ApiEnv } from "./types";
 
 export const correctionApi = new Hono<ApiEnv>();
 
@@ -13,29 +11,17 @@ correctionApi.get("/", async (c) => {
 	const { userId, canReadAll } = c.get("user");
 
 	const corrections = canReadAll
-		? await db.allCorrections()
-		: await db.userCorrections(userId);
+		? await db.corrections.all()
+		: await db.corrections.getByUserId(userId);
 	return c.json(corrections);
 });
 
 correctionApi.use("/:deviceId", checkDeviceOwnership());
 
-correctionApi.get(
-	"/:deviceId",
-	zValidator(
-		"query",
-		z.object({
-			sensorType: SensorTypeParser.optional(),
-		}),
-	),
-	async (c) => {
-		const { deviceId } = c.req.param();
-		const { sensorType } = c.req.valid("query");
+correctionApi.get("/:deviceId", async (c) => {
+	const { deviceId } = c.req.param();
 
-		const corrections = sensorType
-			? await db.sensorCorrections(deviceId, sensorType)
-			: await db.deviceCorrections(deviceId);
+	const corrections = await db.corrections.getByUserId(deviceId);
 
-		return c.json(corrections);
-	},
-);
+	return c.json(corrections);
+});

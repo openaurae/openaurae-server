@@ -1,4 +1,4 @@
-import type { Reading } from "../database";
+import type { Reading } from "database/types";
 
 type Alias = "tmp" | "rh" | "sensor" | "device_id";
 
