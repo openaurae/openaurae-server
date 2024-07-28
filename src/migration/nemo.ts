@@ -10,7 +10,7 @@ import type {
 } from "service/nemo";
 import LocalDate = types.LocalDate;
 import type { Reading } from "database/types";
-import { chunks, retryUntilSuccess } from "utils";
+import { chunks, fromSeconds, retryUntilSuccess } from "utils";
 
 const columnMapping: Record<string, NemoMeasures> = {
 	Battery: "battery",
@@ -132,7 +132,7 @@ class DeviceMigrationTask {
 		}
 
 		console.log(
-			`[Nemo migration] finished ${JSON.stringify({ deviceSerialNum, measureSetBid: measureSet.bid })}`,
+			`[Nemo migration] finished ${JSON.stringify({ deviceSerialNum, measureSetBid: measureSet.bid, valuesNumber: measureSet.valuesNumber, start: fromSeconds(measureSet.start).toISOString(), end: fromSeconds(measureSet.end).toISOString() })}`,
 		);
 	}
 

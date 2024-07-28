@@ -27,3 +27,7 @@ export async function retryUntilSuccess<T>(f: () => Promise<T>): Promise<T> {
 export function formatISODate(date: Date): string {
 	return formatISO(date, { representation: "date" });
 }
+
+export function fromSeconds(seconds: number): Date {
+	return new Date(seconds * 1000);
+}
