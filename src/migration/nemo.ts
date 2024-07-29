@@ -4,7 +4,7 @@ import type {
 	Measure,
 	MeasureSet,
 	NemoCloud,
-	NemoCloudSession,
+	NemoCloudTask,
 	Device as NemoDevice,
 	Value,
 } from "service/nemo";
@@ -40,37 +40,40 @@ type NemoMeasures =
 	| "pm10";
 
 export interface MigrateNemoOpts {
+	deviceSerialNums?: string[];
 	start?: Date;
 	end?: Date;
 	taskNum?: number;
 }
 
 export async function migrate(cloud: NemoCloud, opts?: MigrateNemoOpts) {
-	const { start, end, taskNum = 20 } = opts || {};
+	const { deviceSerialNums, start, end, taskNum = 20 } = opts || {};
 
-	const session = cloud.newSession();
-	const allDevices = await retryUntilSuccess(() => session.devices());
+	const session = cloud.newTask();
+	let targetDevices = await retryUntilSuccess(() => session.devices());
 
-	for (const devices of chunks(allDevices, taskNum)) {
-		await Promise.all(
-			devices
-				.map(
-					(device) =>
-						new DeviceMigrationTask(cloud.newSession(), device, start, end),
-				)
-				.map((task) => task.migrate()),
+	if (deviceSerialNums) {
+		targetDevices = targetDevices.filter((device) =>
+			deviceSerialNums.includes(device.serial),
 		);
+	}
+
+	for (const devices of chunks(targetDevices, taskNum)) {
+		const tasks = devices.map(
+			(device) => new DeviceMigrationTask(cloud.newTask(), device, start, end),
+		);
+		await Promise.all(tasks.map((task) => task.migrate()));
 	}
 }
 
 class DeviceMigrationTask {
-	private readonly session: NemoCloudSession;
+	private readonly session: NemoCloudTask;
 	private readonly device: NemoDevice;
 	private readonly start?: number;
 	private readonly end?: number;
 
 	public constructor(
-		session: NemoCloudSession,
+		session: NemoCloudTask,
 		device: NemoDevice,
 		start?: Date,
 		end?: Date,
@@ -132,7 +135,13 @@ class DeviceMigrationTask {
 		}
 
 		console.log(
-			`[Nemo migration] finished ${JSON.stringify({ deviceSerialNum, measureSetBid: measureSet.bid, valuesNumber: measureSet.valuesNumber, start: fromSeconds(measureSet.start).toISOString(), end: fromSeconds(measureSet.end).toISOString() })}`,
+			`[Nemo migration] finished ${JSON.stringify({
+				deviceSerialNum,
+				measureSetBid: measureSet.bid,
+				valuesNumber: measureSet.valuesNumber,
+				start: fromSeconds(measureSet.start).toISOString(),
+				end: fromSeconds(measureSet.end).toISOString(),
+			})}`,
 		);
 	}
 

@@ -1,5 +1,4 @@
 import axios, { type AxiosInstance } from "axios";
-import { addMinutes } from "date-fns";
 
 export interface InitParams {
 	url: string;
@@ -34,36 +33,36 @@ export class NemoCloud {
 		});
 	}
 
-	public newSession(): NemoCloudSession {
-		return new NemoCloudSession(this.httpClient, this.loginParams);
+	public newTask(): NemoCloudTask {
+		return new NemoCloudTask(this.httpClient, this.loginParams);
 	}
 }
 
-export class NemoCloudSession {
+export class NemoCloudTask {
 	private readonly httpClient: AxiosInstance;
 	private readonly loginParams: LoginParams;
-	private id = "";
-	private expiresAt: Date = new Date(0);
 
 	constructor(httpClient: AxiosInstance, loginParams: LoginParams) {
 		this.httpClient = httpClient;
 		this.loginParams = loginParams;
 	}
 
+	/**
+	 * It's better to use a new session for each API call because the cloud server may restart in the middle of the task.
+	 * In this case the cloud server invalidates all previous sessions so that all subsequent requests will fail.
+	 *
+	 * @private
+	 */
 	private async sessionId(): Promise<string> {
-		if (new Date() >= this.expiresAt) {
-			await this.login();
-		}
-		return this.id;
+		return await this.login();
 	}
 
 	/**
 	 * Must be called to access other API endpoints. Session expires after 30 min of inactivity.
 	 *
 	 * The session API endpoint require authentication. The authentication is performed using the HTPP Digest access scheme described in section authentication and security.
-	 * @private
 	 */
-	private async login(): Promise<void> {
+	public async login(): Promise<string> {
 		const resp = await this.httpClient.post<{ sessionId: string }>(
 			"/session/login",
 			this.loginParams,
@@ -76,8 +75,7 @@ export class NemoCloudSession {
 			},
 		);
 
-		this.id = resp.data.sessionId;
-		this.expiresAt = addMinutes(new Date(), 25);
+		return resp.data.sessionId;
 	}
 
 	/**
