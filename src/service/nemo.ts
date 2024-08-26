@@ -33,12 +33,12 @@ export class NemoCloud {
 		});
 	}
 
-	public newTask(): NemoCloudTask {
-		return new NemoCloudTask(this.httpClient, this.loginParams);
+	public newSession(): NemoCloudSession {
+		return new NemoCloudSession(this.httpClient, this.loginParams);
 	}
 }
 
-export class NemoCloudTask {
+export class NemoCloudSession {
 	private readonly httpClient: AxiosInstance;
 	private readonly loginParams: LoginParams;
 
@@ -101,8 +101,8 @@ export class NemoCloudTask {
 	 * The values returned correspond to the data to which the operator is associated.
 	 * @param deviceSerialNumber
 	 */
-	public async device(deviceSerialNumber: string): Promise<Device> {
-		const resp = await this.httpClient.get<Device>(
+	public async device(deviceSerialNumber: string): Promise<DetailedDevice> {
+		const resp = await this.httpClient.get<DetailedDevice>(
 			`/devices/${deviceSerialNumber}`,
 			{
 				headers: {
@@ -179,6 +179,16 @@ export class NemoCloudTask {
 		);
 		return resp.data;
 	}
+
+	public async room(roomBid: number) {
+		const resp = await this.httpClient.get<Room>(`/rooms/${roomBid}`, {
+			headers: {
+				sessionId: await this.sessionId(),
+			},
+		});
+
+		return resp.data;
+	}
 }
 
 export interface Device {
@@ -188,6 +198,14 @@ export interface Device {
 	serial: string;
 	// device’s name
 	name: string;
+}
+
+export interface DetailedDevice extends Device {
+	roomBid: number;
+	campaignBid: number;
+	firstMeasureSet: number;
+	lastMeasureSet: number;
+	numberMeasureSet: number;
 }
 
 export interface DeviceMeasureSets {
@@ -279,4 +297,10 @@ export interface Sensor {
 	refExposition: string;
 	// Number of times a sensor is exposed
 	exposedNumber: number;
+}
+
+export interface Room {
+	bid: number;
+	name: string;
+	buildingBid: number;
 }

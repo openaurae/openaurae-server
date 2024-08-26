@@ -17,6 +17,7 @@ export interface Device {
 	longitude?: number;
 	last_record?: Date;
 	sensor_types?: string[];
+	room?: string;
 }
 
 /**

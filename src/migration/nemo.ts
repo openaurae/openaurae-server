@@ -4,7 +4,7 @@ import type {
 	Measure,
 	MeasureSet,
 	NemoCloud,
-	NemoCloudTask,
+	NemoCloudSession,
 	Device as NemoDevice,
 	Value,
 } from "service/nemo";
@@ -49,7 +49,7 @@ export interface MigrateNemoOpts {
 export async function migrate(cloud: NemoCloud, opts?: MigrateNemoOpts) {
 	const { deviceSerialNums, start, end, taskNum = 20 } = opts || {};
 
-	const session = cloud.newTask();
+	const session = cloud.newSession();
 	let targetDevices = await retryUntilSuccess(() => session.devices());
 
 	if (deviceSerialNums) {
@@ -60,20 +60,21 @@ export async function migrate(cloud: NemoCloud, opts?: MigrateNemoOpts) {
 
 	for (const devices of chunks(targetDevices, taskNum)) {
 		const tasks = devices.map(
-			(device) => new DeviceMigrationTask(cloud.newTask(), device, start, end),
+			(device) =>
+				new DeviceMigrationTask(cloud.newSession(), device, start, end),
 		);
 		await Promise.all(tasks.map((task) => task.migrate()));
 	}
 }
 
 class DeviceMigrationTask {
-	private readonly session: NemoCloudTask;
+	private readonly session: NemoCloudSession;
 	private readonly device: NemoDevice;
 	private readonly start?: number;
 	private readonly end?: number;
 
 	public constructor(
-		session: NemoCloudTask,
+		session: NemoCloudSession,
 		device: NemoDevice,
 		start?: Date,
 		end?: Date,
@@ -85,10 +86,13 @@ class DeviceMigrationTask {
 	}
 
 	public async migrate(): Promise<void> {
+		const room = await this.session.device(this.device.serial);
+
 		await db.devices.upsert({
 			id: this.device.serial,
 			name: this.device.name,
 			sensor_types: ["nemo_cloud"],
+			room: room.name,
 		});
 
 		const deviceMeasureSets = await retryUntilSuccess(() =>
