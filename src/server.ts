@@ -1,14 +1,13 @@
 import { app } from "app";
 import { db } from "database";
 import { port } from "env";
-// import { mqttClient } from "mq";
+import { mqttClientFromEnv } from "mq";
 
 await db.connect();
 
-// mqttClient.subscribe("zigbee/#");
-// mqttClient.subscribe("air-quality/#");
-
-// every 4 hour
+const mqttClient = await mqttClientFromEnv();
+mqttClient.subscribe("zigbee/#");
+mqttClient.subscribe("air-quality/#");
 
 export default {
 	port: port,
