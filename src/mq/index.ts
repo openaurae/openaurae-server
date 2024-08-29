@@ -13,8 +13,8 @@ export async function mqttClientFromEnv(): Promise<MqttClient> {
 	});
 
 	client.on("message", async (topic, messageBuffer) => {
-		if (topic.match(/zigbee\/.*?\/bridge\/(config|state)/)) {
-			// skip config and state messages
+		if (topic.match(/zigbee\/.*?\/bridge\/(config|state|log)/)) {
+			// skip config, log and state messages
 			return;
 		}
 
