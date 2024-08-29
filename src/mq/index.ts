@@ -13,6 +13,14 @@ export async function mqttClientFromEnv(): Promise<MqttClient> {
 	});
 
 	client.on("message", async (topic, messageBuffer) => {
+		if (topic.match(/zigbee\/.*?\/bridge\/(config|state)/)) {
+			// skip config and state messages
+			return;
+		}
+
+		console.log(topic);
+		console.log(messageBuffer.toString());
+
 		const message = JSON.parse(messageBuffer.toString());
 
 		console.log(`[MQTT] [${topic}] ${JSON.stringify(message)}`);
