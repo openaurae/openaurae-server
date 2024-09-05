@@ -17,6 +17,7 @@ export interface Device {
 	longitude?: number;
 	last_record?: Date;
 	sensor_types?: string[];
+	device_type: "nemo_cloud" | "air_quality" | "zigbee";
 	room?: string;
 }
 
