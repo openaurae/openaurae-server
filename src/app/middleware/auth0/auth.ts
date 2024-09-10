@@ -1,9 +1,9 @@
-import type { ApiEnv, Auth0User, UserClaims } from "app/types";
 import { auth0Audience, auth0Issuer, auth0Secret } from "env";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { verify } from "jsonwebtoken";
+import type { Auth0Env, Auth0User, UserClaims } from "./types";
 
 /**
  * Verify user access token from request.
@@ -11,7 +11,7 @@ import { verify } from "jsonwebtoken";
  *
  * @see {parseRequestJwtToken}
  */
-export const auth0 = createMiddleware<ApiEnv>(async (c, next) => {
+export const auth0 = createMiddleware<Auth0Env>(async (c, next) => {
 	parseRequestJwtToken(c);
 	await next();
 });
@@ -19,12 +19,12 @@ export const auth0 = createMiddleware<ApiEnv>(async (c, next) => {
 /**
  * Verify admin access token from request.
  * The access token must be a valid JWT token issued by Auth0 openaurae API
- * and contain permission `admin`.
+ * and contain the `admin` permission.
  *
  * @see {parseRequestJwtToken}
  */
 export const auth0Admin = ({ readWrite } = { readWrite: false }) =>
-	createMiddleware<ApiEnv>(async (c, next) => {
+	createMiddleware<Auth0Env>(async (c, next) => {
 		parseRequestJwtToken(c);
 		const { canModifyAll, canReadAll } = c.get("user");
 
@@ -52,7 +52,7 @@ export const auth0Admin = ({ readWrite } = { readWrite: false }) =>
  * @see https://github.com/auth0/node-jsonwebtoken
  * @see https://hono.dev/docs/helpers/jwt#payload-validation
  */
-function parseRequestJwtToken(c: Context<ApiEnv>): void {
+function parseRequestJwtToken(c: Context<Auth0Env>): void {
 	const token =
 		c.req.header("Authorization")?.replace(/^Bearer /, "") ||
 		c.req.query("accessToken") ||
@@ -61,12 +61,16 @@ function parseRequestJwtToken(c: Context<ApiEnv>): void {
 	const claims = verifyJwtToken(token);
 
 	const roles = new Set(claims.permissions);
+	const isAdmin = roles.has("admin");
+	const isReadOnlyAdmin = roles.has("read:admin");
 
 	const user: Auth0User = {
 		userId: claims.sub,
-		canReadAll: roles.has("admin") || roles.has("read:admin"),
-		canModifyAll: roles.has("admin"),
 		permissions: claims.permissions,
+		isAdmin,
+		isReadOnlyAdmin,
+		canReadAll: isAdmin || isReadOnlyAdmin,
+		canModifyAll: isAdmin,
 	};
 
 	c.set("jwtPayload", claims);

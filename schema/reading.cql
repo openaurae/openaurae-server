@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS reading
+CREATE TABLE IF NOT EXISTS aurae.reading
 (
     device           text,
     date             date,

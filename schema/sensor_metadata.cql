@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS sensor_metadata
+CREATE TABLE IF NOT EXISTS aurae.sensor_metadata
 (
     type       text primary key,
     metric_names set<text>,

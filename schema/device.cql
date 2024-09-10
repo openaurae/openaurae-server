@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS device
+CREATE TABLE IF NOT EXISTS aurae.device
 (
     id           text primary key,
     name         text,

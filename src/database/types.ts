@@ -10,42 +10,74 @@ export interface User {
 	devices: string[];
 }
 
-export interface Device {
-	id: string;
-	name: string;
-	latitude?: number;
-	longitude?: number;
-	last_record?: Date;
-	sensor_types?: string[];
-	device_type: "nemo_cloud" | "air_quality" | "zigbee";
-	room?: string;
-}
+/**
+ * All device types.
+ *
+ * - `air_quality`: AQ boxes containing a `pms5003st` sensor and a `ptqs1005` sensor.
+ * - `zigbee`: Zigbee devices containing `zigbee_*` sensors.
+ * - `nemo_cloud`: devices which upload readings to the [Nemo Cloud server](https://nemocloud.com/)
+ *  and the [S5 Nemo Cloud server](https://s5.nemocloud.com/).
+ *
+ * Use `.enum` to access a specific device type.
+ *
+ * ```typescript
+ *	DeviceTypeSchema.enum.zigbee; // "zigbee"
+ * ```
+ *
+ * Use `.options` to access all device types.
+ *
+ * ```typescript
+ *    DeviceTypeSchema.options; // ["nemo_cloud", "air_quality", "zigbee"]
+ * ```
+ *
+ * @see [Zod enums](https://zod.dev/?id=zod-enums)
+ */
+export const DeviceTypeSchema = z.enum(["nemo_cloud", "air_quality", "zigbee"]);
+export type DeviceType = z.infer<typeof DeviceTypeSchema>;
+
+export const SensorTypeSchema = z.enum([
+	"ptqs1005",
+	"pms5003st",
+	"zigbee_temp",
+	"zigbee_contact",
+	"zigbee_power",
+	"zigbee_occupancy",
+	"zigbee_vibration",
+	"nemo_cloud",
+]);
+export type SensorType = z.infer<typeof SensorTypeSchema>;
+
+export const DeviceSchema = z.object({
+	id: z.string().regex(/^[\w:]{1,50}$/),
+	name: z.string().min(1).max(50),
+	type: DeviceTypeSchema,
+	last_record: z.date().optional(),
+	sensor_types: SensorTypeSchema.array().optional(),
+	latitude: z.coerce.number().lte(90).gte(-90).optional(),
+	longitude: z.coerce.number().lte(180).gte(-180).optional(),
+	room: z.string().optional(),
+});
+export type Device = z.infer<typeof DeviceSchema>;
 
 /**
- * Note: `id` is not unique in previous `ptqs1005` records
+ * Primary key is `((device), id)`.
+ *
+ * - For AQ boxes containing a `pms5003st` sensor and a `ptqs1005` sensor,
+ * sensor ids are always `pms5003st` and `ptqs1005`.
+ * - For Zigbee devices, sensor ids are sensors' serial numbers.
+ * - For Nemo Cloud devices, sensor ids are fetched from the sensor API.
  */
-export interface Sensor {
-	id: string;
-	device: string;
-	type: string;
-	name?: string;
-	comments?: string;
-	last_record?: Date;
-}
+export const SensorSchema = z.object({
+	device: z.string(),
+	id: z.string(),
+	type: SensorTypeSchema,
+	name: z.string().optional(),
+	comments: z.string().optional(),
+	last_record: z.date().optional(),
+});
+export type Sensor = z.infer<typeof SensorSchema>;
 
-export type SensorKey = Pick<Sensor, "id" | "device" | "type">;
-
-export const readingSchema = z.object({
-	// PK
-	device: z.string().describe("device id"),
-	date: z.instanceof(LocalDate),
-	// CK
-	reading_type: z.string().describe("sensor type"),
-	sensor_id: z.string(),
-	processed: z.boolean().describe("whether applied corrections"),
-	time: z.date(),
-
-	// measures
+export const MetricsSchema = z.object({
 	action: z.string().optional(),
 	angle: z.number().optional(),
 	angle_x: z.number().optional(),
@@ -63,9 +95,6 @@ export const readingSchema = z.object({
 	contact: z.boolean().optional(),
 	humidity: z.number().optional(),
 	illuminance: z.number().optional(),
-	ip_address: z.string().optional(),
-	latitude: z.number().optional(),
-	longitude: z.number().optional(),
 	occupancy: z.boolean().optional(),
 	pd05: z.number().optional(),
 	pd10: z.number().optional(),
@@ -85,7 +114,10 @@ export const readingSchema = z.object({
 	power: z.number().optional(),
 	state: z.string().optional(),
 	temperature: z.number().optional().describe("Temperature (°C)"),
-	tvoc: z.number().optional(),
+	tvoc: z
+		.number()
+		.optional()
+		.describe("Total Volatile Organic Compounds (ppm)"),
 	voltage: z.number().optional(),
 	lvocs: z
 		.number()
@@ -93,37 +125,71 @@ export const readingSchema = z.object({
 		.describe("Light Volatile Organic Compounds (ppb)"),
 	pressure: z.number().optional().describe("Pressure (mb)"),
 });
+export type Metrics = z.infer<typeof MetricsSchema>;
 
-export type Reading = z.infer<typeof readingSchema>;
+export const MetricNameSchema = MetricsSchema.keyof();
+export type MetricName = z.infer<typeof MetricNameSchema>;
 
-export const measuresSchema = readingSchema.omit({
-	device: true,
-	date: true,
-	reading_type: true,
-	sensor_id: true,
-	processed: true,
-	time: true,
+export const ReadingSchema = MetricsSchema.extend({
+	// PK
+	device: z.string().describe("device id"),
+	date: z.instanceof(LocalDate),
+	// CK
+	reading_type: z.string().describe("sensor type"),
+	sensor_id: z.string(),
+	processed: z.boolean().describe("whether applied corrections"),
+	time: z.date(),
+	// other fields
+	ip_address: z.string().optional(),
+	latitude: z.number().optional(),
+	longitude: z.number().optional(),
 });
+export type Reading = z.infer<typeof ReadingSchema>;
 
-export type Measures = z.infer<typeof measuresSchema>;
+export type MeasurementQuery<T extends MetricName> = {
+	deviceId: string;
+	date: Date;
+	sensorId: string;
+	sensorType: string;
+	processed: boolean;
+	startTime: Date;
+	endTime: Date;
+	metricName: T;
+};
 
-export type Measure<T extends keyof Measures> = Pick<Reading, "time" | T>;
+/**
+ * Result type of the measurement query function.
+ *
+ * ```
+ * const measurement: Measurement<"angle"> = {
+ *    time: new Date("2024-09-10T05:31:42.022Z"),
+ *    value: 10.5,
+ *    angle: 10.5,
+ * };
+ * ```
+ */
+export type Measurement<T extends MetricName> = {
+	time: Date;
+	value: Metrics[T];
+} & {
+	[K in T]: Metrics[K];
+};
 
 export interface Correction {
 	device: string;
 	reading_type: string;
-	metric: keyof Measures;
+	metric: MetricName;
 	expression: string;
 }
 
-export interface SensorType {
-	id: string;
-	measures: string[];
+export interface SensorMetadata {
+	type: SensorType;
+	metric_names: MetricName[];
 }
 
-export interface MeasureMetadata {
-	id: string;
-	name: string;
+export interface MetricMetadata {
+	name: MetricName;
+	display_name: string;
 	unit?: string;
 	is_bool: boolean;
 }

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS sensor
+CREATE TABLE IF NOT EXISTS aurae.sensor
 (
     device      text,
     type        text,

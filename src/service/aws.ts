@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
 import { types } from "cassandra-driver";
-import type { Device, Reading, Sensor } from "database/types";
+import type { Device, Reading, SensorSchema } from "database/types";
 import LocalDate = types.LocalDate;
 
 type _Reading = Omit<Reading, "date" | "time"> & {
@@ -14,7 +14,7 @@ type QueryReadingsResult = {
 	};
 };
 
-type DeviceWithSensors = Device & { sensors: Sensor[] };
+type DeviceWithSensors = Device & { sensors: SensorSchema[] };
 
 export type QueryDevicesResult = {
 	data: {

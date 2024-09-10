@@ -3,13 +3,14 @@ import type {
 	Correction,
 	Device,
 	Mapper,
-	Measure,
-	MeasureMetadata,
-	Measures,
+	Measurement,
+	MeasurementQuery,
+	MetricMetadata,
+	MetricName,
 	ModelMapper,
 	Reading,
 	Sensor,
-	SensorKey,
+	SensorMetadata,
 	SensorType,
 	User,
 } from "./types";
@@ -23,8 +24,14 @@ export class Sensors {
 		this.sensorMapper = mapper.forModel("Sensor");
 	}
 
-	public async getByKey(key: SensorKey): Promise<Sensor | null> {
-		return await this.sensorMapper.get(key);
+	public async getById(
+		deviceId: string,
+		sensorId: string,
+	): Promise<Sensor | null> {
+		return await this.sensorMapper.get({
+			device: deviceId,
+			id: sensorId,
+		});
 	}
 
 	public async getByDeviceId(deviceId: string): Promise<Sensor[]> {
@@ -38,8 +45,12 @@ export class Sensors {
 		await this.sensorMapper.insert(sensor);
 	}
 
-	public async updateLastRecord(key: SensorKey, time: Date) {
-		const sensor = await this.getByKey(key);
+	public async updateLastRecord(
+		deviceId: string,
+		sensorId: string,
+		time: Date,
+	) {
+		const sensor = await this.getById(deviceId, sensorId);
 
 		if (!sensor || (sensor.last_record && sensor.last_record >= time)) {
 			return;
@@ -55,6 +66,13 @@ export class Sensors {
 				ifExists: true,
 			},
 		);
+	}
+
+	public async deleteById(deviceId: string, sensorId: string): Promise<void> {
+		await this.sensorMapper.remove({
+			device: deviceId,
+			id: sensorId,
+		});
 	}
 }
 
@@ -144,16 +162,16 @@ export class Readings {
 		await this.readingMapper.insert(reading);
 		await this.devices.updateLastRecord(reading.device, reading.time);
 		await this.sensors.updateLastRecord(
-			{
-				device: reading.device,
-				id: reading.sensor_id,
-				type: reading.reading_type,
-			},
+			reading.device,
+			reading.sensor_id,
 			reading.time,
 		);
 	}
 
-	public async getByKey(deviceId: string, date: Date): Promise<Reading[]> {
+	public async getByIdAndDate(
+		deviceId: string,
+		date: Date,
+	): Promise<Reading[]> {
 		const result = await this.readingMapper.find({
 			device: deviceId,
 			date,
@@ -161,29 +179,42 @@ export class Readings {
 		return result.toArray();
 	}
 
-	public async getMeasuresByKey<T extends keyof Measures>(
-		name: T,
-		{ deviceId, date, sensorType, sensorId, processed }: ReadingKey,
-	): Promise<Measure<T>[]> {
+	/**
+	 * Get readings of a specific measurement type within a specific time range of a date.
+	 *
+	 * @see [Mapper queries](https://docs.datastax.com/en/developer/nodejs-driver/4.7/features/mapper/queries/index.html)
+	 */
+	public async getMetrics<T extends MetricName>({
+		deviceId,
+		date,
+		sensorType,
+		sensorId,
+		processed,
+		startTime,
+		endTime,
+		metricName,
+	}: MeasurementQuery<T>): Promise<Measurement<T>[]> {
 		const result = await this.readingMapper.find(
 			{
 				device: deviceId,
-				date: date,
+				date,
 				reading_type: sensorType,
 				sensor_id: sensorId,
 				processed,
+				time: q.and(q.gte(startTime), q.lte(endTime)),
 			},
 			{
-				fields: ["time", name],
-				orderBy: {
-					reading_type: "asc",
-					sensor_id: "asc",
-					processed: "asc",
-					time: "desc",
-				},
+				fields: ["time", metricName],
 			},
 		);
-		return result.toArray();
+
+		return result
+			.toArray()
+			.map((reading) => ({
+				...reading,
+				value: reading[metricName],
+			}))
+			.filter(({ value }) => value !== null);
 	}
 }
 
@@ -208,6 +239,13 @@ export class Users {
 
 	public async upsert(user: User): Promise<void> {
 		await this.userMapper.insert(user);
+	}
+
+	public async addDevice(userId: string, deviceId: string): Promise<void> {
+		const user = await this.getById(userId);
+		user.devices.push(deviceId);
+
+		await this.upsert(user);
 	}
 }
 
@@ -246,34 +284,40 @@ export class Corrections {
 	}
 }
 
-export class MeasureMetas {
-	private readonly metadataMapper: ModelMapper<MeasureMetadata>;
-	private readonly sensorTypes: SensorTypes;
+export class MetricMetas {
+	private readonly metadataMapper: ModelMapper<MetricMetadata>;
+	private readonly sensorMetas: SensorMetas;
 
-	public constructor(mapper: Mapper, sensorTypes: SensorTypes) {
-		this.metadataMapper = mapper.forModel("MeasureMetadata");
-		this.sensorTypes = sensorTypes;
+	public constructor(mapper: Mapper, sensorMetas: SensorMetas) {
+		this.metadataMapper = mapper.forModel("MetricMetadata");
+		this.sensorMetas = sensorMetas;
 	}
 
-	public async all(): Promise<MeasureMetadata[]> {
+	public async all(): Promise<MetricMetadata[]> {
 		const result = await this.metadataMapper.findAll();
 		return result.toArray();
 	}
 
-	public async getByIds(ids: string[]): Promise<MeasureMetadata[]> {
+	public async getByName(name: string): Promise<MetricMetadata | null> {
+		return await this.metadataMapper.get({
+			name,
+		});
+	}
+
+	public async getByNames(names: string[]): Promise<MetricMetadata[]> {
 		const result = await this.metadataMapper.find({
-			id: q.in_(ids),
+			name: q.in_(names),
 		});
 		return result.toArray();
 	}
 
-	public async getBySensorType(type: string): Promise<MeasureMetadata[]> {
-		const sensorType = await this.sensorTypes.getById(type);
+	public async getBySensorType(type: string): Promise<MetricMetadata[]> {
+		const sensorType = await this.sensorMetas.getByType(type);
 
 		if (!sensorType) {
 			return [];
 		}
-		return await this.getByIds(sensorType.measures);
+		return await this.getByNames(sensorType.metric_names);
 	}
 
 	public async exists(id: string): Promise<boolean> {
@@ -282,29 +326,34 @@ export class MeasureMetas {
 	}
 }
 
-export class SensorTypes {
-	private readonly sensorTypeMapper: ModelMapper<SensorType>;
+export class SensorMetas {
+	private readonly sensorTypeMapper: ModelMapper<SensorMetadata>;
 
 	public constructor(mapper: Mapper) {
-		this.sensorTypeMapper = mapper.forModel("SensorType");
+		this.sensorTypeMapper = mapper.forModel("SensorMetadata");
 	}
 
-	public async all(): Promise<SensorType[]> {
+	public async all(): Promise<SensorMetadata[]> {
 		const result = await this.sensorTypeMapper.findAll();
 		return result.toArray();
 	}
 
-	public async getById(id: string): Promise<SensorType | null> {
-		return await this.sensorTypeMapper.get({ id });
+	public async metricNamesByType(): Promise<Map<SensorType, MetricName[]>> {
+		const map = new Map<SensorType, MetricName[]>();
+
+		for (const { type, metric_names } of await this.all()) {
+			map.set(type, metric_names);
+		}
+
+		return map;
 	}
 
-	public async getByIds(ids: string[]): Promise<SensorType[]> {
-		const result = await this.sensorTypeMapper.find({ id: q.in_(ids) });
-		return result.toArray();
+	public async getByType(type: string): Promise<SensorMetadata | null> {
+		return await this.sensorTypeMapper.get({ type });
 	}
 
-	public async exists(id: string): Promise<boolean> {
-		const result = await this.sensorTypeMapper.get({ id });
-		return result != null;
+	public async exists(type: string): Promise<boolean> {
+		const result = await this.sensorTypeMapper.get({ id: type });
+		return result !== null;
 	}
 }
