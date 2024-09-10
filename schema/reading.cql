@@ -1,45 +1,4 @@
-CREATE KEYSPACE IF NOT EXISTS aurae WITH REPLICATION = {'class' : 'SimpleStrategy','replication_factor' : 1};
-
-CREATE TABLE if not exists aurae.user
-(
-    id       text primary key,
-    devices  set<text>,
-);
-
-CREATE TABLE if not exists aurae.device
-(
-    id           text primary key,
-    last_record  timestamp,
-    latitude     float,
-    longitude    float,
-    name         text,
-    sensor_types set<text>
-);
-
-CREATE TABLE if not exists aurae.sensor
-(
-    device      text,
-    type        text,
-    id          text,
-    comments    text,
-    last_record timestamp,
-    name        text,
-    primary key (device, type, id)
-);
-
-CREATE index if not exists sensors_by_id
-    on aurae.sensor (id);
-
-CREATE TABLE if not exists aurae.correction
-(
-    device       text,
-    reading_type text,
-    metric       text,
-    expression   text,
-    primary key ((device), reading_type , metric)
-);
-
-CREATE TABLE if not exists aurae.reading
+CREATE TABLE IF NOT EXISTS reading
 (
     device           text,
     date             date,
@@ -92,17 +51,3 @@ CREATE TABLE if not exists aurae.reading
     voltage          float,
     primary key ((device, date), reading_type, sensor_id, processed, time)
 ) WITH CLUSTERING ORDER BY (reading_type ASC, sensor_id ASC, processed ASC, time DESC);
-
-CREATE TABLE IF NOT EXISTS aurae.measure_metadata
-(
-    id      text primary key,
-    name    text,
-    is_bool boolean,
-    unit    text
-);
-
-CREATE TABLE IF NOT EXISTS aurae.sensor_type
-(
-    id       text primary key,
-    measures set<text>,
-);
