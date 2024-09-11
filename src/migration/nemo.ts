@@ -91,6 +91,7 @@ class DeviceMigrationTask {
 		await db.devices.upsert({
 			id: this.device.serial,
 			name: this.device.name,
+			type: "nemo_cloud",
 			sensor_types: ["nemo_cloud"],
 			room: room.name,
 		});
