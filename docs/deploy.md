@@ -3,7 +3,7 @@
 ## Build Executable
 
 ```shell
-bun build src/server.ts --compile --outfile openaurae-server
+bun run build-server
 ```
 
 ## Deploy as a Systemd Service
@@ -13,7 +13,7 @@ Create a file named `openaurae-server.service` under `/etc/systemd/system`
 ```unit file (systemd)
 [Unit]
 Description=OpenAurae Server.
-FailureAction=none
+After=network-online.target,scylla-server.service
 
 [Install]
 WantedBy=multi-user.target
@@ -22,11 +22,12 @@ WantedBy=multi-user.target
 Type=exec
 ExecStart=/var/openaurae/openaurae-server
 WorkingDirectory=/var/openaurae/
-Restart=always
-RestartSec=5
+Restart=on-failure
+RestartSec=5s
+
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=%n
+SyslogIdentifier=openaurae-server
 ```
 
 ```shell
