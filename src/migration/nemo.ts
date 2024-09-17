@@ -86,7 +86,8 @@ class DeviceMigrationTask {
 	}
 
 	public async migrate(): Promise<void> {
-		const room = await this.session.device(this.device.serial);
+		const { roomBid } = await this.session.device(this.device.serial);
+		const room = await this.session.room(roomBid);
 
 		await db.devices.upsert({
 			id: this.device.serial,
