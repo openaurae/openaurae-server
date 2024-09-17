@@ -5,7 +5,7 @@
 		"mq": "bun run --hot src/mq/index.ts",
 		"format": "bunx @biomejs/biome check --write",
 		"lefthook": "lefthook install",
-		"build-server": "bun build src/bin/server.ts --compile --outfile openaurae-server"
+		"build-server": "bun build src/bin/server.ts --compile --env-file .env --outfile openaurae-server"
 	},
 	"dependencies": {
 		"@hono/zod-validator": "^0.2.2",
